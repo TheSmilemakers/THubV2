@@ -1,0 +1,196 @@
+{
+  "name": "THub V2 - Webhook Test (DEPLOY READY)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "test-webhook",
+        "responseMode": "onReceived",
+        "responseData": "firstEntryJson",
+        "options": {
+          "noResponseBody": false
+        }
+      },
+      "id": "test-webhook",
+      "name": "Test Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [250, 300],
+      "webhookId": "test-webhook",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "try {\n  const input = $input.first();\n  const data = input ? input.json : {};\n  \n  console.log('Test webhook received data:', JSON.stringify(data, null, 2));\n  \n  // Simulate a simple market scan test\n  const testResult = {\n    action: data.action || 'unknown',\n    timestamp: new Date().toISOString(),\n    received: data,\n    test: {\n      success: true,\n      message: 'Webhook test successful',\n      filters: data.filters || {},\n      symbolCount: data.symbols ? data.symbols.length : 0\n    }\n  };\n  \n  console.log('Test result:', JSON.stringify(testResult, null, 2));\n  \n  return [{ json: testResult }];\n  \n} catch (error) {\n  console.error('Test webhook error:', error.message);\n  \n  return [{\n    json: {\n      success: false,\n      error: error.message,\n      timestamp: new Date().toISOString()\n    }\n  }];\n}"
+      },
+      "id": "process-test",
+      "name": "Process Test",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [450, 300],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.APP_URL || 'http://localhost:3000' }}/api/webhooks/n8n",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBodyType": "json",
+        "jsonBody": "={{ JSON.stringify({\n  action: 'health',\n  timestamp: new Date().toISOString(),\n  source: 'n8n-test-workflow'\n}) }}",
+        "options": {
+          "timeout": 10000,
+          "redirect": {
+            "redirect": {
+              "maxRedirects": 5
+            }
+          }
+        }
+      },
+      "id": "test-api-connection",
+      "name": "Test API Connection",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [650, 300],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "success-check",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "ok",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        }
+      },
+      "id": "check-api-response",
+      "name": "API Response OK?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [850, 300],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ {\n  success: true,\n  message: 'Test successful - n8n can communicate with THub V2',\n  apiResponse: $json,\n  timestamp: new Date().toISOString()\n} }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "respond-success",
+      "name": "Success Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1050, 200]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ {\n  success: false,\n  message: 'Test failed - Check authentication and URL configuration',\n  error: $json.error || 'API connection failed',\n  timestamp: new Date().toISOString()\n} }}",
+        "options": {
+          "responseCode": 500
+        }
+      },
+      "id": "respond-error",
+      "name": "Error Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1050, 400]
+    }
+  ],
+  "connections": {
+    "Test Webhook": {
+      "main": [
+        [
+          {
+            "node": "Process Test",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Test": {
+      "main": [
+        [
+          {
+            "node": "Test API Connection",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Test API Connection": {
+      "main": [
+        [
+          {
+            "node": "API Response OK?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ],
+      "error": [
+        [
+          {
+            "node": "Error Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "API Response OK?": {
+      "main": [
+        [
+          {
+            "node": "Success Response",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Error Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": "",
+    "timezone": "America/New_York"
+  },
+  "staticData": null,
+  "tags": [
+    {
+      "createdAt": "2025-01-19T04:00:00.000Z",
+      "updatedAt": "2025-01-19T04:00:00.000Z",
+      "id": "deploy-ready",
+      "name": "Deploy Ready"
+    }
+  ],
+  "triggerCount": 1,
+  "updatedAt": "2025-01-19T04:00:00.000Z",
+  "versionId": "1"
+}
