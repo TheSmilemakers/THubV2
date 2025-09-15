@@ -1,0 +1,13 @@
+{
+  "buildCommand": "pnpm install --frozen-lockfile=false && pnpm run build",
+  "framework": "nextjs",
+  "env": {
+    "CI": "true"
+  },
+  "build": {
+    "env": {
+      "CI": "true",
+      "NEXT_TELEMETRY_DISABLED": "1"
+    }
+  }
+}
