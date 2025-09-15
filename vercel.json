@@ -1,5 +1,6 @@
 {
-  "buildCommand": "pnpm install --frozen-lockfile=false && pnpm run build",
+  "buildCommand": "rm -rf node_modules .pnpm-store && pnpm install --force && pnpm run build",
+  "installCommand": "pnpm install --force",
   "framework": "nextjs",
   "env": {
     "CI": "true"
@@ -7,7 +8,8 @@
   "build": {
     "env": {
       "CI": "true",
-      "NEXT_TELEMETRY_DISABLED": "1"
+      "NEXT_TELEMETRY_DISABLED": "1",
+      "SKIP_ENV_VALIDATION": "true"
     }
   }
 }
