@@ -1,26 +1,151 @@
-@import "tailwindcss";
+/* Import Tailwind v4 with configuration */
+@import './tailwind.css';
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
+@layer base {
+  /* Base theme variables - shared structure */
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    /* Layout */
+    --container-max: 1200px;
+    --header-height: 80px;
+    
+    /* Z-index scale */
+    --z-base: 0;
+    --z-dropdown: 100;
+    --z-sticky: 200;
+    --z-modal: 300;
+    --z-tooltip: 400;
+    
+    /* Transitions */
+    --transition-fast: 150ms;
+    --transition-base: 300ms;
+    --transition-slow: 500ms;
+    
+    /* Easing */
+    --ease-out: cubic-bezier(0.25, 1, 0.5, 1);
+    --ease-spring: cubic-bezier(0.68, -0.55, 0.265, 1.55);
+    
+    /* Base Colors */
+    --color-white: 255 255 255;
+    --color-black: 0 0 0;
+  }
+
+  /* Professional Theme */
+  :root[data-theme='professional'] {
+    /* Glass System Overrides */
+    --glass-surface: rgba(255, 255, 255, 0.05);
+    --glass-border: rgba(255, 255, 255, 0.1);
+    
+    /* Use base colors from @theme */
+    --bg-primary: var(--color-bg-primary);
+    --bg-secondary: var(--color-bg-secondary);
+    --bg-tertiary: var(--color-bg-tertiary);
+    --text-primary: var(--color-text-primary);
+    --text-secondary: var(--color-text-secondary);
+    --text-muted: var(--color-text-muted);
+  }
+
+  /* Synthwave Theme */
+  :root[data-theme='synthwave'] {
+    /* Glass System Overrides */
+    --glass-surface: rgba(16, 0, 43, 0.85);
+    --glass-border: rgba(255, 0, 110, 0.3);
+    
+    /* Override theme colors for synthwave */
+    --bg-primary: 16 0 43;
+    --bg-secondary: 0 0 0;
+    --bg-tertiary: 36 0 70;
+    --text-primary: var(--color-terminal-green);
+    --text-secondary: var(--color-neon-cyan);
+    --text-muted: var(--color-neon-purple);
+    
+    /* Neon Effects */
+    --neon-glow: 0 0 20px rgba(255, 0, 110, 0.8);
+  }
+
+  /* Global variables that are theme-neutral */
+  :root {
+    /* Status Colors - theme-neutral */
+    --status-success: 34 197 94;
+    --status-warning: 234 179 8;
+    --status-error: 239 68 68;
+    --status-info: 59 130 246;
+    
+    /* Touch Targets - universal standards */
+    --touch-target-min: 44px;
+    --touch-target-comfortable: 48px;
+    --touch-target-accessible: 56px;
+    
+    /* Animation System - universal timings */
+    --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
+    --ease-out-cubic: cubic-bezier(0.33, 1, 0.68, 1);
+    --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+    --ease-spring: cubic-bezier(0.68, -0.55, 0.265, 1.55);
+    
+    --duration-fast: 150ms;
+    --duration-normal: 300ms;
+    --duration-slow: 500ms;
+    --duration-slower: 750ms;
+    
+    /* Layout System - universal */
+    --space-header: 80px;
+    --container-max-width: 1200px;
+    
+    /* Z-index scale - universal */
+    --z-base: 0;
+    --z-dropdown: 100;
+    --z-sticky: 200; 
+    --z-modal: 300;
+    --z-tooltip: 400;
+  }
+
+  body {
+    color: rgb(var(--text-primary));
+    background: linear-gradient(to bottom, rgb(var(--bg-primary)), rgb(var(--bg-secondary)));
+    min-height: 100vh;
+    font-family: 'Inter', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@layer components {
+  /* Legacy Glass System - now handled by Tailwind config */
+  /* Keeping minimal legacy support for existing components */
+  
+  .glass-hover {
+    transition: all var(--duration-normal) var(--ease-out-cubic);
+  }
+  
+  .glass-hover:hover {
+    background: rgba(255, 255, 255, 0.15);
+    transform: translateY(-2px);
+    box-shadow: 0 16px 64px rgba(0, 0, 0, 0.4);
+  }
+
+  /* Legacy button support - now using Tailwind classes */
+  .btn-base {
+    font-weight: 500;
+    min-height: var(--touch-target-comfortable);
+    transition: all var(--duration-normal) var(--ease-out-cubic);
+  }
+}
+
+/* Remaining utilities now handled by Tailwind config in tailwind.css */
+/* This file now only contains theme variables and legacy support */
+
+/* Theme-specific overlay visibility */
+.synthwave-overlay {
+  display: none;
+}
+
+.professional-overlay {
+  display: none;
+}
+
+[data-theme="synthwave"] .synthwave-overlay {
+  display: block;
+}
+
+[data-theme="professional"] .professional-overlay {
+  display: block;
 }
