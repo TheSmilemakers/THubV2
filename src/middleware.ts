@@ -1,12 +1,19 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { applyCSPMiddleware } from './middleware-csp';
+// import { applyCSPMiddleware } from './middleware-csp';
 
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next();
 
   // Apply Content Security Policy
-  response = applyCSPMiddleware(request, response);
+  // Temporarily disabled for MVP - causing issues with Next.js script loading
+  // response = applyCSPMiddleware(request, response);
+
+  // Add basic security headers
+  response.headers.set('X-Frame-Options', 'DENY');
+  response.headers.set('X-Content-Type-Options', 'nosniff');
+  response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+  response.headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
 
   // Add additional security headers for specific routes
   if (request.nextUrl.pathname.startsWith('/api/')) {

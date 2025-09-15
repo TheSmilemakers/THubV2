@@ -12,11 +12,15 @@ function generateCSP(nonce: string): string {
     'script-src': [
       "'self'",
       `'nonce-${nonce}'`,
-      "'strict-dynamic'",
       "'sha256-whC4o9nB0MFB2J+a6xhfcVT/63FwibBEL61akKOGl+w='", // Hash for theme script
       isDev && "'unsafe-eval'", // Required for Next.js dev mode
       'https://cdn.jsdelivr.net', // For any CDN scripts
     ].filter(Boolean),
+    'script-src-elem': [
+      "'self'",
+      `'nonce-${nonce}'`,
+      "'sha256-whC4o9nB0MFB2J+a6xhfcVT/63FwibBEL61akKOGl+w='", // Hash for theme script
+    ],
     'style-src': [
       "'self'",
       "'unsafe-inline'", // Required for inline styles
