@@ -8,6 +8,7 @@ import React from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 import { ThemeProvider } from '@/lib/themes/theme-provider'
+import { ProgressiveEnhancementProvider } from '@/components/providers/progressive-enhancement-provider'
 
 // Create query client with optimal defaults
 const queryClient = new QueryClient({
@@ -39,12 +40,14 @@ export function Providers({ children }: ProvidersProps) {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
-        {children}
-        {process.env.NODE_ENV === 'development' && (
-          <ReactQueryDevtools 
-            initialIsOpen={false}
-          />
-        )}
+        <ProgressiveEnhancementProvider>
+          {children}
+          {process.env.NODE_ENV === 'development' && (
+            <ReactQueryDevtools 
+              initialIsOpen={false}
+            />
+          )}
+        </ProgressiveEnhancementProvider>
       </ThemeProvider>
     </QueryClientProvider>
   )
