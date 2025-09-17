@@ -1,0 +1,288 @@
+{
+  "name": "THub V2 - Pre-Market Gap Scanner",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "30 8 * * 1-5"
+            }
+          ]
+        }
+      },
+      "id": "pre-market-trigger",
+      "name": "Pre-Market Schedule",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 3,
+      "position": [250, 300],
+      "notes": "Runs at 8:30 AM EST every weekday"
+    },
+    {
+      "parameters": {
+        "language": "js",
+        "jsCode": "// Pre-market specific filters\nconst preMarketFilters = {\n  exchange: 'US',\n  minVolume: 500000,        // Lower volume threshold for pre-market\n  minPrice: 5,\n  maxPrice: 500,\n  minDailyChange: 5,         // Higher change threshold for gaps\n  excludeSectors: ['REIT', 'ADR'],\n  limit: 20,                 // Fewer candidates in pre-market\n  focusOnGaps: true,\n  timeOfDay: 'preMarket'\n};\n\n// Get previous day's top movers for comparison\nconst metadata = {\n  scanType: 'pre-market-gaps',\n  timestamp: new Date().toISOString(),\n  filters: preMarketFilters\n};\n\nconsole.log('Pre-market gap scan initiated with filters:', preMarketFilters);\n\nreturn {\n  filters: preMarketFilters,\n  metadata: metadata\n};"
+      },
+      "id": "pre-market-filters",
+      "name": "Pre-Market Filters",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.APP_URL }}/api/webhooks/n8n",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "action",
+              "value": "market_scan"
+            },
+            {
+              "name": "filters",
+              "value": "={{ $json.filters }}"
+            },
+            {
+              "name": "priority",
+              "value": "high"
+            },
+            {
+              "name": "metadata",
+              "value": "={{ $json.metadata }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "pre-market-scan",
+      "name": "Execute Pre-Market Scan",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [650, 300],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "n8n-webhook-auth",
+          "name": "n8n Webhook Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "language": "js",
+        "jsCode": "// Analyze gap characteristics\nconst scanResult = $input.first().json;\nconst candidates = scanResult.candidates || [];\n\n// Categorize gaps\nconst gapAnalysis = candidates.map(candidate => {\n  const changePercent = candidate.changePercent || 0;\n  \n  let gapType = 'unknown';\n  let gapStrength = 'weak';\n  \n  if (changePercent > 10) {\n    gapType = 'breakaway';\n    gapStrength = 'extreme';\n  } else if (changePercent > 5) {\n    gapType = 'runaway';\n    gapStrength = 'strong';\n  } else if (changePercent > 3) {\n    gapType = 'common';\n    gapStrength = 'moderate';\n  }\n  \n  return {\n    ...candidate,\n    gapType: gapType,\n    gapStrength: gapStrength,\n    preMarketVolume: candidate.volume,\n    gapSize: changePercent\n  };\n});\n\n// Sort by gap strength\nconst sortedGaps = gapAnalysis.sort((a, b) => b.gapSize - a.gapSize);\n\n// Identify high-priority gaps\nconst highPriorityGaps = sortedGaps.filter(gap => \n  gap.gapStrength === 'strong' || gap.gapStrength === 'extreme'\n);\n\nconsole.log(`Found ${highPriorityGaps.length} high-priority gaps from ${candidates.length} total`);\n\nreturn {\n  allGaps: sortedGaps,\n  highPriorityGaps: highPriorityGaps,\n  summary: {\n    total: candidates.length,\n    extreme: sortedGaps.filter(g => g.gapStrength === 'extreme').length,\n    strong: sortedGaps.filter(g => g.gapStrength === 'strong').length,\n    moderate: sortedGaps.filter(g => g.gapStrength === 'moderate').length\n  },\n  scanId: scanResult.scanId\n};"
+      },
+      "id": "analyze-gaps",
+      "name": "Analyze Gaps",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "high-priority-check",
+              "leftValue": "={{ $json.highPriorityGaps.length }}",
+              "rightValue": "0",
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ]
+        }
+      },
+      "id": "check-gaps",
+      "name": "High Priority Gaps?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1050, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.APP_URL }}/api/webhooks/n8n",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "action",
+              "value": "batch_analyze"
+            },
+            {
+              "name": "symbols",
+              "value": "={{ $json.highPriorityGaps.map(g => g.symbol) }}"
+            },
+            {
+              "name": "priority",
+              "value": "urgent"
+            },
+            {
+              "name": "metadata",
+              "value": "={{ { source: 'pre_market_gaps', scanId: $json.scanId, gapData: $json.highPriorityGaps } }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "id": "analyze-priority-gaps",
+      "name": "Analyze Priority Gaps",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1250, 200],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "n8n-webhook-auth",
+          "name": "n8n Webhook Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "channel": "#pre-market-alerts",
+        "text": "=🌅 *Pre-Market Gap Alert*",
+        "attachments": [
+          {
+            "color": "#ff9900",
+            "title": "Gap Summary",
+            "fields": {
+              "values": [
+                {
+                  "title": "Total Gaps",
+                  "value": "={{ $json.summary.total }}",
+                  "short": true
+                },
+                {
+                  "title": "Extreme Gaps",
+                  "value": "={{ $json.summary.extreme }}",
+                  "short": true
+                },
+                {
+                  "title": "Strong Gaps",
+                  "value": "={{ $json.summary.strong }}",
+                  "short": true
+                },
+                {
+                  "title": "Time",
+                  "value": "={{ $now.toFormat('HH:mm') }} EST",
+                  "short": true
+                }
+              ]
+            },
+            "footer": "THub V2 Pre-Market Scanner",
+            "ts": "={{ Math.floor($now.toSeconds()) }}"
+          },
+          {
+            "color": "#0099ff",
+            "title": "Top 5 Gaps",
+            "text": "={{ $json.highPriorityGaps.slice(0, 5).map(g => `${g.symbol}: ${g.gapSize.toFixed(1)}% (${g.gapType})`).join('\\n') }}",
+            "footer": "Full analysis being processed..."
+          }
+        ],
+        "otherOptions": {}
+      },
+      "id": "notify-gaps",
+      "name": "Notify Gap Alert",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.1,
+      "position": [1250, 400]
+    }
+  ],
+  "connections": {
+    "Pre-Market Schedule": {
+      "main": [
+        [
+          {
+            "node": "Pre-Market Filters",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pre-Market Filters": {
+      "main": [
+        [
+          {
+            "node": "Execute Pre-Market Scan",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute Pre-Market Scan": {
+      "main": [
+        [
+          {
+            "node": "Analyze Gaps",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analyze Gaps": {
+      "main": [
+        [
+          {
+            "node": "High Priority Gaps?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "High Priority Gaps?": {
+      "main": [
+        [
+          {
+            "node": "Analyze Priority Gaps",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Notify Gap Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analyze Priority Gaps": {
+      "main": [
+        [
+          {
+            "node": "Notify Gap Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner"
+  }
+}

@@ -1,7 +1,10 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { ThemeContext, Theme } from './theme-context';
+
+// Supported themes - easily extensible
+const SUPPORTED_THEMES: readonly Theme[] = ['professional', 'synthwave'] as const;
 
 interface ThemeProviderProps {
   children: React.ReactNode;
@@ -9,42 +12,107 @@ interface ThemeProviderProps {
   storageKey?: string;
 }
 
+// Theme validation
+function isValidTheme(value: unknown): value is Theme {
+  return typeof value === 'string' && SUPPORTED_THEMES.includes(value as Theme);
+}
+
+// Safe localStorage operations
+function getStoredTheme(key: string): Theme | null {
+  try {
+    const stored = localStorage.getItem(key);
+    return isValidTheme(stored) ? stored : null;
+  } catch (error) {
+    console.warn('Failed to read theme from localStorage:', error);
+    return null;
+  }
+}
+
+function setStoredTheme(key: string, theme: Theme): void {
+  try {
+    localStorage.setItem(key, theme);
+  } catch (error) {
+    console.warn('Failed to save theme to localStorage:', error);
+  }
+}
+
 export function ThemeProvider({
   children,
   defaultTheme = 'professional',
   storageKey = 'thub-theme'
 }: ThemeProviderProps) {
-  // Always initialize with defaultTheme to match server
-  const [theme, setTheme] = useState<Theme>(defaultTheme);
-  const [mounted, setMounted] = useState(false);
-
-  // Read theme from localStorage/DOM after mount
-  useEffect(() => {
-    setMounted(true);
-    const savedTheme = localStorage.getItem(storageKey) as Theme;
-    const currentTheme = document.documentElement.getAttribute('data-theme') as Theme;
-    const themeToUse = savedTheme || currentTheme || defaultTheme;
-    
-    if (themeToUse !== theme) {
-      setTheme(themeToUse);
-      document.documentElement.setAttribute('data-theme', themeToUse);
+  // Initialize theme with a stable getter function
+  const [theme, setTheme] = useState<Theme>(() => {
+    // Server-side: use default theme
+    if (typeof window === 'undefined') {
+      return defaultTheme;
     }
-  }, [storageKey, defaultTheme]);
 
-  const toggleTheme = useCallback(() => {
-    const newTheme = theme === 'professional' ? 'synthwave' : 'professional';
-    setTheme(newTheme);
-    localStorage.setItem(storageKey, newTheme);
-    document.documentElement.setAttribute('data-theme', newTheme);
+    // Client-side: check localStorage first, then DOM (set by SSR), then default
+    const storedTheme = getStoredTheme(storageKey);
+    if (storedTheme) {
+      // Apply to DOM immediately to prevent flash
+      document.documentElement.setAttribute('data-theme', storedTheme);
+      return storedTheme;
+    }
+
+    const domTheme = document.documentElement.getAttribute('data-theme');
+    if (isValidTheme(domTheme)) {
+      return domTheme;
+    }
+
+    return defaultTheme;
+  });
+
+  // Track if we've done initial sync
+  const hasSynced = useRef(false);
+
+  // Sync theme on mount (only once)
+  useEffect(() => {
+    if (hasSynced.current) return;
+    hasSynced.current = true;
+
+    // The DOM might already have the correct theme from the script
+    const currentDomTheme = document.documentElement.getAttribute('data-theme');
+    
+    // Update DOM if it doesn't match our state
+    if (currentDomTheme !== theme) {
+      document.documentElement.setAttribute('data-theme', theme);
+    }
+
+    // Ensure localStorage is in sync
+    setStoredTheme(storageKey, theme);
   }, [theme, storageKey]);
+
+  // Theme toggle function with proper state updates
+  const toggleTheme = useCallback(() => {
+    setTheme(currentTheme => {
+      // Find current theme index
+      const currentIndex = SUPPORTED_THEMES.indexOf(currentTheme);
+      // Get next theme (wrap around to first if at end)
+      const nextIndex = (currentIndex + 1) % SUPPORTED_THEMES.length;
+      const newTheme = SUPPORTED_THEMES[nextIndex];
+      
+      // Update DOM immediately for instant feedback
+      document.documentElement.setAttribute('data-theme', newTheme);
+      
+      // Persist to localStorage
+      setStoredTheme(storageKey, newTheme);
+      
+      return newTheme;
+    });
+  }, [storageKey]);
 
   // Sync with localStorage changes (for multi-tab support)
   useEffect(() => {
     const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === storageKey && e.newValue) {
-        const newTheme = e.newValue as Theme;
-        setTheme(newTheme);
-        document.documentElement.setAttribute('data-theme', newTheme);
+      // Only handle our storage key
+      if (e.key !== storageKey) return;
+      
+      // Validate the new value
+      if (isValidTheme(e.newValue)) {
+        setTheme(e.newValue);
+        document.documentElement.setAttribute('data-theme', e.newValue);
       }
     };
 
@@ -52,14 +120,13 @@ export function ThemeProvider({
     return () => window.removeEventListener('storage', handleStorageChange);
   }, [storageKey]);
 
-  // Prevent flash by using default theme until mounted
-  if (!mounted) {
-    return (
-      <ThemeContext.Provider value={{ theme: defaultTheme, toggleTheme: () => {} }}>
-        {children}
-      </ThemeContext.Provider>
-    );
-  }
+  // Ensure theme changes are reflected in DOM
+  useEffect(() => {
+    const currentDomTheme = document.documentElement.getAttribute('data-theme');
+    if (currentDomTheme !== theme) {
+      document.documentElement.setAttribute('data-theme', theme);
+    }
+  }, [theme]);
 
   return (
     <ThemeContext.Provider value={{ theme, toggleTheme }}>

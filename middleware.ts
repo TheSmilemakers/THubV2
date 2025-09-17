@@ -10,7 +10,6 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { validateToken, extractToken } from '@/lib/auth/token-auth'
-import { randomUUID } from 'crypto'
 
 // Routes that require authentication
 const PROTECTED_ROUTES = [
@@ -23,65 +22,11 @@ const PROTECTED_ROUTES = [
 // Routes that are public (landing page, auth)
 const PUBLIC_ROUTES = [
   '/',
+  '/login',
+  '/showcase',
   '/api/webhooks/n8n',
   '/api/test-analysis'
 ]
-
-/**
- * Generate Content Security Policy header
- */
-function generateCSP(nonce: string): string {
-  const isDev = process.env.NODE_ENV === 'development'
-  
-  const directives = {
-    'default-src': ["'self'"],
-    'script-src': [
-      "'self'",
-      `'nonce-${nonce}'`,
-      "'strict-dynamic'",
-      isDev && "'unsafe-eval'", // Required for Next.js dev mode
-      'https://cdn.jsdelivr.net', // For any CDN scripts
-    ].filter(Boolean),
-    'style-src': [
-      "'self'",
-      "'unsafe-inline'", // Required for inline styles
-      'https://fonts.googleapis.com',
-    ],
-    'img-src': [
-      "'self'",
-      'data:',
-      'blob:',
-      'https://*.githubusercontent.com',
-      'https://*.googleusercontent.com',
-      'https://avatars.supabase.co',
-    ],
-    'font-src': [
-      "'self'",
-      'https://fonts.gstatic.com',
-    ],
-    'connect-src': [
-      "'self'",
-      process.env.NEXT_PUBLIC_SUPABASE_URL,
-      'https://eodhistoricaldata.com',
-      'wss://*.supabase.co',
-      isDev && 'ws://localhost:*',
-    ].filter(Boolean),
-    'media-src': ["'self'"],
-    'object-src': ["'none'"],
-    'child-src': ["'none'"],
-    'frame-src': ["'none'"],
-    'worker-src': ["'self'", 'blob:'],
-    'form-action': ["'self'"],
-    'base-uri': ["'self'"],
-    'manifest-src': ["'self'"],
-    'upgrade-insecure-requests': !isDev ? [''] : undefined,
-  }
-
-  return Object.entries(directives)
-    .filter(([_, values]) => values !== undefined)
-    .map(([key, values]) => `${key} ${Array.isArray(values) ? values.join(' ') : values}`)
-    .join('; ')
-}
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
@@ -95,16 +40,27 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next()
   }
 
-  // Generate nonce for CSP
-  const nonce = Buffer.from(randomUUID()).toString('base64')
+  // TEMPORARY: Disable CSP completely for MVP
+  // TODO: Re-enable with proper configuration after MVP launch
+  console.log('[Middleware] CSP disabled for MVP development')
   
-  // Initialize response with CSP headers
+  // Initialize response
   let response = NextResponse.next()
   
-  // Apply CSP to all responses
-  const cspHeader = generateCSP(nonce)
-  response.headers.set('Content-Security-Policy', cspHeader)
-  response.headers.set('x-nonce', nonce)
+  // Security headers (non-CSP)
+  const securityHeaders = {
+    'X-DNS-Prefetch-Control': 'on',
+    'X-XSS-Protection': '1; mode=block',
+    'X-Frame-Options': 'SAMEORIGIN',
+    'X-Content-Type-Options': 'nosniff',
+    'Referrer-Policy': 'strict-origin-when-cross-origin',
+    'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
+  }
+  
+  // Apply security headers
+  Object.entries(securityHeaders).forEach(([key, value]) => {
+    response.headers.set(key, value)
+  })
 
   // Check if route requires authentication
   const isProtectedRoute = PROTECTED_ROUTES.some(route => 
@@ -125,19 +81,15 @@ export async function middleware(request: NextRequest) {
     const token = extractToken(request)
     
     if (!token) {
-      // Redirect to landing page with error for non-API routes
+      // Redirect to login page for non-API routes
       if (!pathname.startsWith('/api/')) {
-        const loginUrl = new URL('/', request.url)
-        loginUrl.searchParams.set('error', 'authentication_required')
-        const redirectResponse = NextResponse.redirect(loginUrl)
-        // Preserve CSP headers
-        redirectResponse.headers.set('Content-Security-Policy', cspHeader)
-        redirectResponse.headers.set('x-nonce', nonce)
-        return redirectResponse
+        const loginUrl = new URL('/login', request.url)
+        loginUrl.searchParams.set('redirect', pathname)
+        return NextResponse.redirect(loginUrl)
       }
       
       // Return 401 for API routes
-      const errorResponse = new Response(
+      return new Response(
         JSON.stringify({ 
           error: 'Authentication required',
           code: 'UNAUTHORIZED'
@@ -145,32 +97,26 @@ export async function middleware(request: NextRequest) {
         { 
           status: 401,
           headers: { 
-            'Content-Type': 'application/json',
-            'Content-Security-Policy': cspHeader,
-            'x-nonce': nonce
+            'Content-Type': 'application/json'
           }
         }
       )
-      return errorResponse
     }
 
     // Validate the token
     const authResult = await validateToken(token)
     
     if (!authResult.authenticated) {
-      // Redirect to landing page with error for non-API routes
+      // Redirect to login page with error for non-API routes
       if (!pathname.startsWith('/api/')) {
-        const loginUrl = new URL('/', request.url)
+        const loginUrl = new URL('/login', request.url)
         loginUrl.searchParams.set('error', 'invalid_token')
-        const redirectResponse = NextResponse.redirect(loginUrl)
-        // Preserve CSP headers
-        redirectResponse.headers.set('Content-Security-Policy', cspHeader)
-        redirectResponse.headers.set('x-nonce', nonce)
-        return redirectResponse
+        loginUrl.searchParams.set('redirect', pathname)
+        return NextResponse.redirect(loginUrl)
       }
       
       // Return 401 for API routes
-      const errorResponse = new Response(
+      return new Response(
         JSON.stringify({ 
           error: authResult.error,
           code: 'UNAUTHORIZED'
@@ -178,13 +124,10 @@ export async function middleware(request: NextRequest) {
         { 
           status: 401,
           headers: { 
-            'Content-Type': 'application/json',
-            'Content-Security-Policy': cspHeader,
-            'x-nonce': nonce
+            'Content-Type': 'application/json'
           }
         }
       )
-      return errorResponse
     }
 
     // Clone request headers and add user info for downstream use
@@ -200,9 +143,7 @@ export async function middleware(request: NextRequest) {
       },
     })
     
-    // Apply CSP headers to the response
-    response.headers.set('Content-Security-Policy', cspHeader)
-    response.headers.set('x-nonce', nonce)
+    // CSP disabled for MVP - will be re-enabled with proper configuration post-launch
     
     // Set cookie for subsequent requests
     response.cookies.set('thub_access_token', token, {
@@ -223,11 +164,13 @@ export const config = {
   matcher: [
     /*
      * Match all request paths except for the ones starting with:
-     * - api (API routes)
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
+     * - public assets (images, etc)
+     * 
+     * Note: API routes ARE included for authentication and CSP headers
      */
-    '/((?!_next/static|_next/image|favicon.ico).*)',
+    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }

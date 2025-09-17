@@ -34,6 +34,8 @@ export const GET = withUserRateLimit(
       }
 
       const params = validation.data;
+      const urlParams = new URL(request.url).searchParams;
+      const singleSymbol = urlParams.get('symbol') || undefined;
       
       // Generate cache key based on parameters
       const cacheKey = `signals:${JSON.stringify({
@@ -66,7 +68,8 @@ export const GET = withUserRateLimit(
       
       // Map query params to SignalFilters
       const filters: SignalFilters = {
-        symbol: symbols?.[0], // Take first symbol for now
+        // Support both symbol and symbols[] (take first)
+        symbol: singleSymbol || (symbols && symbols.length > 0 ? symbols[0] : undefined),
         min_score: minScore,
         max_score: maxScore,
         // Additional filters can be mapped here
@@ -121,82 +124,3 @@ export const GET = withUserRateLimit(
     }
   }
 );
-
-/**
- * POST /api/signals/:id/view - Mark signal as viewed
- */
-export async function POST(request: NextRequest) {
-  try {
-    const userId = request.headers.get('x-user-id');
-    if (!userId) {
-      return NextResponse.json(
-        { error: 'Authentication required' },
-        { status: 401 }
-      );
-    }
-
-    // Get signal ID from URL
-    const url = new URL(request.url);
-    const pathParts = url.pathname.split('/');
-    const signalId = pathParts[pathParts.length - 2]; // Get ID before 'view'
-
-    if (!signalId || signalId === 'signals') {
-      return NextResponse.json(
-        { error: 'Signal ID required' },
-        { status: 400 }
-      );
-    }
-
-    // Mark as viewed functionality would be implemented here
-    // For now, just return success
-    // TODO: Implement markAsViewed in SignalsService
-
-    return NextResponse.json({ success: true });
-  } catch (error) {
-    logger.error('Failed to mark signal as viewed', { error });
-    return NextResponse.json(
-      { error: 'Failed to mark signal as viewed' },
-      { status: 500 }
-    );
-  }
-}
-
-/**
- * PUT /api/signals/:id/save - Toggle saved status
- */
-export async function PUT(request: NextRequest) {
-  try {
-    const userId = request.headers.get('x-user-id');
-    if (!userId) {
-      return NextResponse.json(
-        { error: 'Authentication required' },
-        { status: 401 }
-      );
-    }
-
-    // Get signal ID from URL
-    const url = new URL(request.url);
-    const pathParts = url.pathname.split('/');
-    const signalId = pathParts[pathParts.length - 2]; // Get ID before 'save'
-
-    if (!signalId || signalId === 'signals') {
-      return NextResponse.json(
-        { error: 'Signal ID required' },
-        { status: 400 }
-      );
-    }
-
-    // Toggle saved functionality would be implemented here
-    // For now, just return success
-    // TODO: Implement toggleSaved in SignalsService
-    const isSaved = false;
-
-    return NextResponse.json({ saved: isSaved });
-  } catch (error) {
-    logger.error('Failed to toggle saved status', { error });
-    return NextResponse.json(
-      { error: 'Failed to toggle saved status' },
-      { status: 500 }
-    );
-  }
-}

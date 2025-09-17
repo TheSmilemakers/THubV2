@@ -157,13 +157,30 @@ export class EODHDService {
   }
 
   /**
+   * Normalize symbol for EODHD API
+   * - Regular stocks: Add .US if no exchange specified
+   * - Indices: Keep as-is (e.g., GSPC.INDX)
+   * - Already has exchange: Keep as-is (e.g., AAPL.US, TSLA.NASDAQ)
+   */
+  private normalizeSymbol(symbol: string): string {
+    // If symbol already has an exchange suffix (contains a dot), return as-is
+    if (symbol.includes('.')) {
+      return symbol;
+    }
+    
+    // Otherwise, add .US for US stocks
+    return `${symbol}.US`;
+  }
+
+  /**
    * Get real-time quote for a symbol
    * API Cost: 1 call
    */
   async getRealTimeQuote(symbol: string): Promise<RealTimeQuote> {
     try {
+      const normalizedSymbol = this.normalizeSymbol(symbol);
       const response = await this.client.get<RealTimeQuote>(
-        `/real-time/${symbol}.US`,
+        `/real-time/${normalizedSymbol}`,
         {
           params: { 
             api_token: this.apiKey,
@@ -172,7 +189,7 @@ export class EODHDService {
         }
       );
       
-      this.logger.info(`Fetched real-time quote for ${symbol}`);
+      this.logger.info(`Fetched real-time quote for ${normalizedSymbol}`);
       return response.data;
     } catch (error) {
       this.logger.error(`Failed to fetch real-time quote for ${symbol}`, error);
@@ -192,10 +209,11 @@ export class EODHDService {
   ): Promise<EODData[]> {
     const fromDate = from || this.getDateString(days);
     const toDate = to || this.getDateString(0);
+    const normalizedSymbol = this.normalizeSymbol(symbol);
     
     try {
       const response = await this.client.get<EODData[]>(
-        `/eod/${symbol}.US`,
+        `/eod/${normalizedSymbol}`,
         {
           params: {
             api_token: this.apiKey,
@@ -206,7 +224,7 @@ export class EODHDService {
         }
       );
       
-      this.logger.info(`Fetched ${response.data.length} days of historical data for ${symbol}`);
+      this.logger.info(`Fetched ${response.data.length} days of historical data for ${normalizedSymbol}`);
       return response.data;
     } catch (error) {
       this.logger.error(`Failed to fetch historical data for ${symbol}`, error);
@@ -234,12 +252,13 @@ export class EODHDService {
       if (from) params.from = from;
       if (to) params.to = to;
 
+      const normalizedSymbol = this.normalizeSymbol(symbol);
       const response = await this.client.get<IntradayData[]>(
-        `/intraday/${symbol}.US`,
+        `/intraday/${normalizedSymbol}`,
         { params }
       );
       
-      this.logger.info(`Fetched ${response.data.length} intraday data points for ${symbol}`);
+      this.logger.info(`Fetched ${response.data.length} intraday data points for ${normalizedSymbol}`);
       return response.data;
     } catch (error) {
       this.logger.error(`Failed to fetch intraday data for ${symbol}`, error);
@@ -252,9 +271,10 @@ export class EODHDService {
    * API Cost: 5 calls
    */
   async getRSI(symbol: string, period: number = 14): Promise<TechnicalIndicator[]> {
+    const normalizedSymbol = this.normalizeSymbol(symbol);
     try {
       const response = await this.client.get<TechnicalIndicator[]>(
-        `/technical/${symbol}.US`,
+        `/technical/${normalizedSymbol}`,
         {
           params: {
             api_token: this.apiKey,
@@ -283,9 +303,10 @@ export class EODHDService {
     slowPeriod = 26, 
     signalPeriod = 9
   ): Promise<MACDData[]> {
+    const normalizedSymbol = this.normalizeSymbol(symbol);
     try {
       const response = await this.client.get<MACDData[]>(
-        `/technical/${symbol}.US`,
+        `/technical/${normalizedSymbol}`,
         {
           params: {
             api_token: this.apiKey,
@@ -298,7 +319,7 @@ export class EODHDService {
         }
       );
       
-      this.logger.info(`Fetched MACD(${fastPeriod},${slowPeriod},${signalPeriod}) for ${symbol}`);
+      this.logger.info(`Fetched MACD(${fastPeriod},${slowPeriod},${signalPeriod}) for ${normalizedSymbol}`);
       return response.data;
     } catch (error) {
       this.logger.error(`Failed to fetch MACD for ${symbol}`, error);
@@ -311,9 +332,10 @@ export class EODHDService {
    * API Cost: 5 calls
    */
   async getSMA(symbol: string, period: number = 20): Promise<TechnicalIndicator[]> {
+    const normalizedSymbol = this.normalizeSymbol(symbol);
     try {
       const response = await this.client.get<TechnicalIndicator[]>(
-        `/technical/${symbol}.US`,
+        `/technical/${normalizedSymbol}`,
         {
           params: {
             api_token: this.apiKey,
@@ -324,7 +346,7 @@ export class EODHDService {
         }
       );
       
-      this.logger.info(`Fetched SMA(${period}) for ${symbol}`);
+      this.logger.info(`Fetched SMA(${period}) for ${normalizedSymbol}`);
       return response.data;
     } catch (error) {
       this.logger.error(`Failed to fetch SMA for ${symbol}`, error);
@@ -341,9 +363,10 @@ export class EODHDService {
     period: number = 20,
     stdDev: number = 2
   ): Promise<BollingerBandsData[]> {
+    const normalizedSymbol = this.normalizeSymbol(symbol);
     try {
       const response = await this.client.get<BollingerBandsData[]>(
-        `/technical/${symbol}.US`,
+        `/technical/${normalizedSymbol}`,
         {
           params: {
             api_token: this.apiKey,
@@ -355,7 +378,7 @@ export class EODHDService {
         }
       );
       
-      this.logger.info(`Fetched Bollinger Bands(${period},${stdDev}) for ${symbol}`);
+      this.logger.info(`Fetched Bollinger Bands(${period},${stdDev}) for ${normalizedSymbol}`);
       return response.data;
     } catch (error) {
       this.logger.error(`Failed to fetch Bollinger Bands for ${symbol}`, error);

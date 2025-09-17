@@ -2,11 +2,21 @@
 
 import { useTheme } from '@/lib/themes/use-theme';
 import { cn } from '@/lib/utils';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 
 interface BackgroundEffectsProps {
   className?: string;
   intensity?: 'low' | 'medium' | 'high';
+}
+
+interface Particle {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  size: number;
+  opacity: number;
+  color: string;
 }
 
 export function BackgroundEffects({ 
@@ -16,45 +26,21 @@ export function BackgroundEffects({
   const { theme } = useTheme();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isClient, setIsClient] = useState(false);
+  
+  // Use refs to store animation state to prevent re-initialization
+  const animationIdRef = useRef<number>(0);
+  const particlesRef = useRef<Particle[]>([]);
+  const isInitializedRef = useRef(false);
 
   // Set client flag after mount
   useEffect(() => {
     setIsClient(true);
   }, []);
 
-  // Canvas animation effect
-  useEffect(() => {
-    if (!isClient) return;
-    
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    // Set canvas size
-    const resizeCanvas = () => {
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
-    };
-
-    resizeCanvas();
-    window.addEventListener('resize', resizeCanvas);
-
-    // Animation variables
-    let animationId: number;
-    const particles: Array<{
-      x: number;
-      y: number;
-      vx: number;
-      vy: number;
-      size: number;
-      opacity: number;
-      color: string;
-    }> = [];
-
-    // Create particles based on theme and intensity
+  // Initialize particles only once
+  const initializeParticles = useCallback((canvas: HTMLCanvasElement) => {
     const particleCount = intensity === 'high' ? 150 : intensity === 'medium' ? 100 : 50;
+    const particles: Particle[] = [];
     
     for (let i = 0; i < particleCount; i++) {
       particles.push({
@@ -68,6 +54,53 @@ export function BackgroundEffects({
           ? ['#ff006e', '#8338ec', '#3a86ff', '#06ffa5'][Math.floor(Math.random() * 4)]
           : '#8b5cf6'
       });
+    }
+    
+    particlesRef.current = particles;
+    isInitializedRef.current = true;
+  }, [intensity, theme]);
+
+  // Update particle colors when theme changes
+  useEffect(() => {
+    if (!isInitializedRef.current) return;
+    
+    particlesRef.current.forEach(particle => {
+      particle.color = theme === 'synthwave' 
+        ? ['#ff006e', '#8338ec', '#3a86ff', '#06ffa5'][Math.floor(Math.random() * 4)]
+        : '#8b5cf6';
+    });
+  }, [theme]);
+
+  // Canvas animation effect
+  useEffect(() => {
+    if (!isClient) return;
+    
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    // Set canvas size
+    const resizeCanvas = () => {
+      const needsResize = canvas.width !== window.innerWidth || canvas.height !== window.innerHeight;
+      if (needsResize) {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        
+        // Re-initialize particles if canvas was resized and particles exist
+        if (isInitializedRef.current) {
+          initializeParticles(canvas);
+        }
+      }
+    };
+
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
+
+    // Initialize particles if not already done
+    if (!isInitializedRef.current) {
+      initializeParticles(canvas);
     }
 
     // Animation loop
@@ -83,6 +116,7 @@ export function BackgroundEffects({
       }
 
       // Update and draw particles
+      const particles = particlesRef.current;
       particles.forEach((particle, index) => {
         // Update position
         particle.x += particle.vx;
@@ -117,16 +151,18 @@ export function BackgroundEffects({
         });
       });
 
-      animationId = requestAnimationFrame(animate);
+      animationIdRef.current = requestAnimationFrame(animate);
     };
 
     animate();
 
     return () => {
       window.removeEventListener('resize', resizeCanvas);
-      cancelAnimationFrame(animationId);
+      if (animationIdRef.current) {
+        cancelAnimationFrame(animationIdRef.current);
+      }
     };
-  }, [theme, intensity, isClient]);
+  }, [isClient, theme, initializeParticles]); // Dependencies optimized
 
   // Grid drawing function for synthwave theme
   function drawGrid(ctx: CanvasRenderingContext2D, width: number, height: number) {

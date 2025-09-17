@@ -95,7 +95,7 @@ export function usePerformanceMonitor(options: PerformanceMonitorOptions = {}) {
   }, [enableMonitoring, targetFps, sampleSize, onPerformanceDrop]);
 
   useEffect(() => {
-    if (!enableMonitoring) return;
+    if (!enableMonitoring || typeof window === 'undefined') return;
 
     // Start monitoring
     lastFrameTimeRef.current = typeof performance !== 'undefined' ? performance.now() : Date.now();
@@ -198,6 +198,6 @@ export function useOptimizedGestures() {
     useNativeScroll: !performanceMonitor.metrics.isPerforming || capabilities.gpu === 'low-end',
     
     // Enable haptic feedback
-    enableHaptics: capabilities.touch && 'vibrate' in navigator,
+    enableHaptics: capabilities.touch && typeof navigator !== 'undefined' && 'vibrate' in navigator,
   };
 }

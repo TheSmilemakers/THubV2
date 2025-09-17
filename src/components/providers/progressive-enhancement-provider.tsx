@@ -11,7 +11,7 @@
  */
 'use client';
 
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { useProgressiveEnhancement, ProgressiveEnhancementConfig, EnhancementTier, UserPreferences } from '@/lib/hooks/use-progressive-enhancement';
 
 interface ProgressiveEnhancementContextValue {
@@ -50,6 +50,41 @@ interface ProgressiveEnhancementProviderProps {
   persistPreferences?: boolean;
 }
 
+// Debounce helper
+function useDebounce<T extends (...args: any[]) => void>(
+  callback: T,
+  delay: number
+): T {
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const callbackRef = useRef(callback);
+
+  // Update ref when callback changes
+  useEffect(() => {
+    callbackRef.current = callback;
+  }, [callback]);
+
+  const debouncedCallback = useCallback((...args: Parameters<T>) => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
+
+    timeoutRef.current = setTimeout(() => {
+      callbackRef.current(...args);
+    }, delay);
+  }, [delay]) as T;
+
+  // Cleanup
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, []);
+
+  return debouncedCallback;
+}
+
 export function ProgressiveEnhancementProvider({
   children,
   debugMode = false,
@@ -58,17 +93,32 @@ export function ProgressiveEnhancementProvider({
   const enhancement = useProgressiveEnhancement();
   const [isAutoMode, setIsAutoMode] = useState(true);
   const [manualTier, setManualTier] = useState<string | null>(null);
-  const [debugInfo, setDebugInfo] = useState({
-    deviceScore: 0,
-    networkScore: 0,
-    totalScore: 0,
-    autoTier: 'standard',
-    overrides: [] as string[],
+  
+  // Use refs for values that shouldn't trigger re-renders
+  const lastSavedPrefs = useRef<string>('');
+  const isLoadingPrefs = useRef(true);
+  const userPreferencesRef = useRef(enhancement.userPreferences);
+
+  // Store enhancement methods in refs to avoid circular dependencies
+  const enhancementMethodsRef = useRef({
+    setTier: enhancement.setTier,
+    setUserPreferences: enhancement.setUserPreferences,
   });
+
+  // Update refs when methods change
+  useEffect(() => {
+    enhancementMethodsRef.current = {
+      setTier: enhancement.setTier,
+      setUserPreferences: enhancement.setUserPreferences,
+    };
+  }, [enhancement.setTier, enhancement.setUserPreferences]);
 
   // Load persisted preferences on mount
   useEffect(() => {
-    if (!persistPreferences) return;
+    if (!persistPreferences) {
+      isLoadingPrefs.current = false;
+      return;
+    }
 
     try {
       const saved = localStorage.getItem('progressive-enhancement-preferences');
@@ -77,37 +127,65 @@ export function ProgressiveEnhancementProvider({
         if (prefs.manualTier) {
           setManualTier(prefs.manualTier);
           setIsAutoMode(false);
-          enhancement.setTier(prefs.manualTier);
+          enhancementMethodsRef.current.setTier(prefs.manualTier);
         }
         if (prefs.userPreferences) {
-          enhancement.setUserPreferences(prefs.userPreferences);
+          enhancementMethodsRef.current.setUserPreferences(prefs.userPreferences);
         }
+        lastSavedPrefs.current = saved;
       }
     } catch (error) {
       console.warn('Failed to load progressive enhancement preferences:', error);
+    } finally {
+      isLoadingPrefs.current = false;
     }
-  }, [persistPreferences, enhancement]);
+  }, [persistPreferences]); // Remove enhancement from dependencies
 
-  // Save preferences when they change
-  useEffect(() => {
-    if (!persistPreferences) return;
+  // Debounced save function
+  const savePreferences = useDebounce(() => {
+    if (!persistPreferences || isLoadingPrefs.current) return;
 
     const prefs = {
       manualTier,
-      userPreferences: enhancement.userPreferences,
+      userPreferences: userPreferencesRef.current, // Use ref instead
       isAutoMode,
     };
 
-    try {
-      localStorage.setItem('progressive-enhancement-preferences', JSON.stringify(prefs));
-    } catch (error) {
-      console.warn('Failed to save progressive enhancement preferences:', error);
+    const prefsString = JSON.stringify(prefs);
+    
+    // Only save if preferences actually changed
+    if (prefsString !== lastSavedPrefs.current) {
+      try {
+        localStorage.setItem('progressive-enhancement-preferences', prefsString);
+        lastSavedPrefs.current = prefsString;
+      } catch (error) {
+        console.warn('Failed to save progressive enhancement preferences:', error);
+      }
     }
-  }, [manualTier, enhancement.userPreferences, isAutoMode, persistPreferences]);
+  }, 500);
 
-  // Update debug info
+  // Track userPreferences changes using ref
   useEffect(() => {
-    if (!debugMode) return;
+    userPreferencesRef.current = enhancement.userPreferences;
+    savePreferences(); // Trigger save when userPreferences change
+  }, [enhancement.userPreferences, savePreferences]);
+
+  // Save preferences when they change (debounced)
+  useEffect(() => {
+    savePreferences();
+  }, [manualTier, isAutoMode, savePreferences]); // Remove enhancement.userPreferences from deps
+
+  // Memoized debug info calculation
+  const debugInfo = useMemo(() => {
+    if (!debugMode) {
+      return {
+        deviceScore: 0,
+        networkScore: 0,
+        totalScore: 0,
+        autoTier: 'standard',
+        overrides: [],
+      };
+    }
 
     const deviceCapabilities = enhancement.deviceCapabilities;
     const networkCapabilities = enhancement.networkCapabilities;
@@ -145,14 +223,21 @@ export function ProgressiveEnhancementProvider({
     if (enhancement.userPreferences.dataUsageMode !== 'unlimited') overrides.push('Data Saving');
     if (!isAutoMode) overrides.push('Manual Override');
 
-    setDebugInfo({
+    return {
       deviceScore,
       networkScore,
       totalScore,
       autoTier: enhancement.currentTier.name,
       overrides,
-    });
-  }, [debugMode, enhancement, isAutoMode]);
+    };
+  }, [
+    debugMode,
+    enhancement.currentTier.name,
+    enhancement.deviceCapabilities,
+    enhancement.networkCapabilities,
+    enhancement.userPreferences,
+    isAutoMode
+  ]);
 
   // Control methods
   const setTier = useCallback((tierName: 'minimal' | 'standard' | 'enhanced' | 'premium') => {
@@ -194,7 +279,8 @@ export function ProgressiveEnhancementProvider({
 
   const getOptimalImageSize = useCallback((baseWidth: number, baseHeight: number) => {
     const { screenSize } = enhancement.deviceCapabilities;
-    const { config } = enhancement;
+    const { saveData } = enhancement.networkCapabilities;
+    const { dataUsageMode } = enhancement.userPreferences;
     
     let multiplier = 1;
     
@@ -204,9 +290,9 @@ export function ProgressiveEnhancementProvider({
     else if (screenSize === 'desktop') multiplier = 1;
     
     // Adjust based on data usage preferences
-    if (enhancement.networkCapabilities.saveData) multiplier *= 0.5;
-    if (enhancement.userPreferences.dataUsageMode === 'conservative') multiplier *= 0.75;
-    if (enhancement.userPreferences.dataUsageMode === 'minimal') multiplier *= 0.5;
+    if (saveData) multiplier *= 0.5;
+    if (dataUsageMode === 'conservative') multiplier *= 0.75;
+    if (dataUsageMode === 'minimal') multiplier *= 0.5;
     
     // Ensure minimum readable size
     const minWidth = 100;
@@ -216,7 +302,11 @@ export function ProgressiveEnhancementProvider({
       width: Math.max(Math.round(baseWidth * multiplier), minWidth),
       height: Math.max(Math.round(baseHeight * multiplier), minHeight),
     };
-  }, [enhancement]);
+  }, [
+    enhancement.deviceCapabilities.screenSize,
+    enhancement.networkCapabilities.saveData,
+    enhancement.userPreferences.dataUsageMode
+  ]);
 
   const shouldLoadContent = useCallback((priority: 'high' | 'medium' | 'low') => {
     const { config, networkCapabilities, userPreferences } = enhancement;
@@ -291,9 +381,73 @@ export function ProgressiveEnhancementProvider({
 
 export function useProgressiveEnhancementContext() {
   const context = useContext(ProgressiveEnhancementContext);
+  
+  // Return SSR-safe defaults if context is not available
   if (!context) {
+    // During SSR or when provider is missing, return safe defaults
+    if (typeof window === 'undefined') {
+      // Server-side: return minimal defaults
+      return {
+        currentTier: { 
+          name: 'standard' as const, 
+          description: 'Balanced experience - good performance with essential enhancements',
+          config: {
+            animations: 'reduced' as const,
+            glassmorphism: 'light' as const,
+            interactions: 'enhanced' as const,
+            particleEffects: false,
+            advancedShaders: false,
+            highRefreshRate: false,
+            hardwareAcceleration: false,
+            autoRefresh: true,
+            backgroundUpdates: false,
+            imageOptimization: 'webp' as const,
+            prefetching: false,
+            reducedMotion: false,
+            highContrast: false,
+            largeText: false,
+            focusIndicators: 'standard' as const,
+          }
+        },
+        config: {
+          animations: 'reduced' as const,
+          glassmorphism: 'light' as const,
+          interactions: 'enhanced' as const,
+          particleEffects: false,
+          advancedShaders: false,
+          highRefreshRate: false,
+          hardwareAcceleration: false,
+          autoRefresh: true,
+          backgroundUpdates: false,
+          imageOptimization: 'webp' as const,
+          prefetching: false,
+          reducedMotion: false,
+          highContrast: false,
+          largeText: false,
+          focusIndicators: 'standard' as const,
+        },
+        isAutoMode: true,
+        setTier: () => {},
+        setUserPreferences: () => {},
+        toggleAutoMode: () => {},
+        resetToAuto: () => {},
+        isFeatureEnabled: () => false,
+        getOptimalImageSize: () => ({ width: 800, height: 600, quality: 80 }),
+        shouldLoadContent: () => true,
+        debugInfo: {
+          deviceScore: 5,
+          networkScore: 2.5,
+          totalScore: 5,
+          overrides: [],
+        },
+      };
+    }
+    
+    // Client-side without provider - this is an error
+    console.error('useProgressiveEnhancementContext must be used within a ProgressiveEnhancementProvider');
     throw new Error('useProgressiveEnhancementContext must be used within a ProgressiveEnhancementProvider');
   }
+  
   return context;
 }
 

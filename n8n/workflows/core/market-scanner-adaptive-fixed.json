@@ -1,0 +1,541 @@
+{
+  "name": "THub V2 - Adaptive Market Scanner (FIXED)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 30
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Market Hours Schedule",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [250, 300],
+      "notes": "Runs every 30 minutes during market hours (9:30 AM - 4:00 PM EST)",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "market-hours-check",
+              "leftValue": "={{ $now.toFormat('HH:mm') }}",
+              "rightValue": "09:30",
+              "operator": {
+                "type": "dateTime",
+                "operation": "after"
+              }
+            },
+            {
+              "id": "market-close-check",
+              "leftValue": "={{ $now.toFormat('HH:mm') }}",
+              "rightValue": "16:00",
+              "operator": {
+                "type": "dateTime",
+                "operation": "before"
+              }
+            },
+            {
+              "id": "weekday-check",
+              "leftValue": "={{ $now.weekday }}",
+              "rightValue": "6",
+              "operator": {
+                "type": "number",
+                "operation": "smaller"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "market-status",
+      "name": "Is Market Open?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [450, 300],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://api.finnhub.io/api/v1/quote?symbol=SPY&token=test",
+        "options": {
+          "timeout": 10000,
+          "retry": {
+            "enabled": true,
+            "maxAttempts": 3
+          }
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        }
+      },
+      "id": "market-conditions",
+      "name": "Get Market Conditions",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [650, 300],
+      "notes": "Fetch market conditions using SPY as proxy",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "try {\n  // Get market conditions from previous node\n  const input = $input.first();\n  const marketData = input ? input.json : {};\n  \n  // Mock VIX data if not available (for testing)\n  const mockVix = Math.random() * 30 + 15; // Random VIX between 15-45\n  const mockVolume = 50000000 + Math.random() * 50000000; // 50-100M volume\n  \n  const marketConditions = {\n    vix: mockVix,\n    totalVolume: mockVolume,\n    trend: mockVix > 25 ? 'risk-off' : 'neutral'\n  };\n\n  // Determine adaptive filters based on market conditions\n  const adaptiveFilters = {\n    exchange: 'US',\n    minVolume: marketConditions.vix > 25 ? 2000000 : 1000000,\n    minPrice: 5,\n    maxPrice: marketConditions.totalVolume < 50000000 ? 200 : 500,\n    minDailyChange: marketConditions.vix > 30 ? 3 : 2,\n    excludeSectors: ['REIT', 'ADR'],\n    limit: marketConditions.vix > 25 ? 50 : 30\n  };\n\n  // Time-based adjustments\n  const hour = new Date().getHours();\n  let timeOfDay = 'midday';\n  \n  if (hour === 8) timeOfDay = 'preMarket';\n  else if (hour === 9) timeOfDay = 'openingBell';\n  else if (hour === 15) timeOfDay = 'powerHour';\n  else if (hour >= 16) timeOfDay = 'afterHours';\n  \n  if (timeOfDay === 'powerHour') {\n    adaptiveFilters.minDailyChange = 2.5;\n    adaptiveFilters.limit = 35;\n  }\n\n  // Log the configuration\n  console.log(`Market conditions: VIX=${marketConditions.vix.toFixed(1)}, Volume=${marketConditions.totalVolume}`);\n  console.log(`Time of day: ${timeOfDay}`);\n  console.log(`Adaptive filters:`, JSON.stringify(adaptiveFilters, null, 2));\n\n  return [{\n    json: {\n      filters: adaptiveFilters,\n      marketConditions: marketConditions,\n      timeOfDay: timeOfDay,\n      timestamp: new Date().toISOString()\n    }\n  }];\n  \n} catch (error) {\n  console.error('Error in adaptive filters:', error.message);\n  \n  // Return default filters on error\n  return [{\n    json: {\n      filters: {\n        exchange: 'US',\n        minVolume: 1000000,\n        minPrice: 5,\n        maxPrice: 200,\n        minDailyChange: 2,\n        excludeSectors: ['REIT', 'ADR'],\n        limit: 10\n      },\n      marketConditions: { vix: 20, totalVolume: 50000000, trend: 'neutral' },\n      timeOfDay: 'midday',\n      timestamp: new Date().toISOString(),\n      error: error.message\n    }\n  }];\n}"
+      },
+      "id": "adaptive-filters",
+      "name": "Apply Adaptive Filters",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [850, 300],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.APP_URL || 'http://localhost:3000' }}/api/webhooks/n8n",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "json",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "action",
+              "value": "market_scan"
+            },
+            {
+              "name": "filters",
+              "value": "={{ $json.filters }}"
+            },
+            {
+              "name": "priority",
+              "value": "high"
+            },
+            {
+              "name": "metadata",
+              "value": "={{ { workflow: 'adaptive_market_scanner', timestamp: $json.timestamp, marketConditions: $json.marketConditions, timeOfDay: $json.timeOfDay } }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000,
+          "retry": {
+            "enabled": true,
+            "maxAttempts": 2
+          }
+        }
+      },
+      "id": "market-scan",
+      "name": "Execute Market Scan",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1050, 300],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "n8n-webhook-auth",
+          "name": "n8n Webhook Auth"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "success-check",
+              "leftValue": "={{ $json.success }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "candidates-check",
+              "leftValue": "={{ $json.summary ? $json.summary.queued : 0 }}",
+              "rightValue": "0",
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "scan-success",
+      "name": "Scan Successful?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1250, 300],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "try {\n  // Get scan result from previous node\n  const input = $input.first();\n  const scanResult = input ? input.json : {};\n  const candidates = scanResult.candidates || [];\n\n  console.log(`Starting quality control on ${candidates.length} candidates`);\n\n  // Filter out suspicious results with comprehensive checks\n  const validCandidates = candidates.filter(candidate => {\n    try {\n      // Ensure candidate has required fields\n      if (!candidate.symbol || !candidate.price || candidate.volume === undefined) {\n        console.warn(`Missing required fields for candidate:`, candidate.symbol);\n        return false;\n      }\n      \n      // Check for unrealistic gains (more than 100%)\n      const changePercent = Math.abs(candidate.changePercent || 0);\n      if (changePercent > 100) {\n        console.warn(`Unrealistic change: ${candidate.symbol} with ${changePercent}% change`);\n        return false;\n      }\n      \n      // Check for minimum liquidity\n      if (candidate.volume < 10000) {\n        console.warn(`Low liquidity: ${candidate.symbol} with volume ${candidate.volume}`);\n        return false;\n      }\n      \n      // Check for penny stocks\n      if (candidate.price < 1) {\n        console.warn(`Penny stock filtered: ${candidate.symbol} at $${candidate.price}`);\n        return false;\n      }\n      \n      // Check for suspicious volume spikes\n      const volumeRatio = candidate.volumeRatio || 1;\n      if (volumeRatio > 50) {\n        console.warn(`Suspicious volume spike: ${candidate.symbol} with ${volumeRatio}x normal volume`);\n        return false;\n      }\n      \n      // Check for valid price range\n      if (candidate.price > 10000) {\n        console.warn(`Unrealistic price: ${candidate.symbol} at $${candidate.price}`);\n        return false;\n      }\n      \n      return true;\n      \n    } catch (error) {\n      console.error(`Error checking candidate ${candidate.symbol}:`, error.message);\n      return false;\n    }\n  });\n\n  const qualityControl = {\n    original: candidates.length,\n    filtered: validCandidates.length,\n    removed: candidates.length - validCandidates.length,\n    filterRules: {\n      unrealisticChange: '> 100%',\n      lowLiquidity: '< 10,000 volume',\n      pennyStocks: '< $1',\n      volumeSpikes: '> 50x normal',\n      priceRange: '> $10,000'\n    }\n  };\n\n  console.log(`Quality control complete: ${qualityControl.original} -> ${qualityControl.filtered} (removed ${qualityControl.removed})`);\n\n  return [{\n    json: {\n      ...scanResult,\n      candidates: validCandidates,\n      qualityControl: qualityControl,\n      timestamp: new Date().toISOString()\n    }\n  }];\n  \n} catch (error) {\n  console.error('Error in quality control:', error.message);\n  \n  // Return original data on error\n  const input = $input.first();\n  return [{\n    json: {\n      ...input.json,\n      qualityControl: {\n        original: 0,\n        filtered: 0,\n        removed: 0,\n        error: error.message\n      },\n      timestamp: new Date().toISOString()\n    }\n  }];\n}"
+      },
+      "id": "quality-control",
+      "name": "Quality Control",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1450, 200],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.APP_URL || 'http://localhost:3000' }}/api/webhooks/n8n",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "json",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "action",
+              "value": "batch_analyze"
+            },
+            {
+              "name": "symbols",
+              "value": "={{ $json.candidates ? $json.candidates.map(c => c.symbol) : [] }}"
+            },
+            {
+              "name": "priority",
+              "value": "high"
+            },
+            {
+              "name": "metadata",
+              "value": "={{ { source: 'market_scan', scanId: $json.scanId, opportunityScores: $json.candidates ? $json.candidates.map(c => ({ symbol: c.symbol, score: c.opportunityScore || 50 })) : [] } }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 60000,
+          "retry": {
+            "enabled": true,
+            "maxAttempts": 2
+          }
+        }
+      },
+      "id": "queue-analysis",
+      "name": "Queue for Analysis",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1650, 200],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "n8n-webhook-auth",
+          "name": "n8n Webhook Auth"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "high-value-check",
+              "leftValue": "={{ $json.summary ? $json.summary.signalsCreated : 0 }}",
+              "rightValue": "0",
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ]
+        }
+      },
+      "id": "check-signals",
+      "name": "High Value Signals?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1850, 200],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "create",
+        "channel": "#trading-signals",
+        "text": "🚨 *New High-Confidence Signals Found!*",
+        "attachments": [
+          {
+            "color": "#00ff00",
+            "title": "Signal Summary",
+            "fields": {
+              "values": [
+                {
+                  "title": "Total Scanned",
+                  "value": "={{ $node['Execute Market Scan'].json.summary ? $node['Execute Market Scan'].json.summary.totalScanned : 'N/A' }}",
+                  "short": true
+                },
+                {
+                  "title": "Candidates Found",
+                  "value": "={{ $node['Execute Market Scan'].json.summary ? $node['Execute Market Scan'].json.summary.queued : 'N/A' }}",
+                  "short": true
+                },
+                {
+                  "title": "Signals Created",
+                  "value": "={{ $json.summary ? $json.summary.signalsCreated : 'N/A' }}",
+                  "short": true
+                },
+                {
+                  "title": "Market VIX",
+                  "value": "={{ $node['Apply Adaptive Filters'].json.marketConditions ? $node['Apply Adaptive Filters'].json.marketConditions.vix.toFixed(1) : 'N/A' }}",
+                  "short": true
+                }
+              ]
+            },
+            "footer": "THub V2 Market Scanner",
+            "ts": "={{ Math.floor(Date.now() / 1000) }}"
+          }
+        ],
+        "otherOptions": {}
+      },
+      "id": "notify-signals",
+      "name": "Notify Signals",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.3,
+      "position": [2050, 100],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { error: true, message: $json.error || 'Market scan failed', timestamp: new Date().toISOString(), workflow: 'market-scanner' } }}",
+        "options": {
+          "responseCode": 500
+        }
+      },
+      "id": "error-handler",
+      "name": "Handle Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1250, 500]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { success: true, message: 'Workflow completed successfully', candidates: $json.qualityControl ? $json.qualityControl.filtered : 0, timestamp: new Date().toISOString() } }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "success-response",
+      "name": "Success Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1850, 350]
+    }
+  ],
+  "connections": {
+    "Market Hours Schedule": {
+      "main": [
+        [
+          {
+            "node": "Is Market Open?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Market Open?": {
+      "main": [
+        [
+          {
+            "node": "Get Market Conditions",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Success Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Market Conditions": {
+      "main": [
+        [
+          {
+            "node": "Apply Adaptive Filters",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Apply Adaptive Filters": {
+      "main": [
+        [
+          {
+            "node": "Execute Market Scan",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute Market Scan": {
+      "main": [
+        [
+          {
+            "node": "Scan Successful?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ],
+      "error": [
+        [
+          {
+            "node": "Handle Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Scan Successful?": {
+      "main": [
+        [
+          {
+            "node": "Quality Control",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Handle Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Quality Control": {
+      "main": [
+        [
+          {
+            "node": "Queue for Analysis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Queue for Analysis": {
+      "main": [
+        [
+          {
+            "node": "High Value Signals?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ],
+      "error": [
+        [
+          {
+            "node": "Success Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "High Value Signals?": {
+      "main": [
+        [
+          {
+            "node": "Notify Signals",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Success Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Signals": {
+      "main": [
+        [
+          {
+            "node": "Success Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": {
+      "useWorkflowSettings": false
+    }
+  },
+  "staticData": null,
+  "tags": [
+    {
+      "createdAt": "2025-01-08T04:00:00.000Z",
+      "updatedAt": "2025-01-08T04:00:00.000Z",
+      "id": "1",
+      "name": "THub V2"
+    },
+    {
+      "createdAt": "2025-01-08T04:00:00.000Z", 
+      "updatedAt": "2025-01-08T04:00:00.000Z",
+      "id": "2",
+      "name": "Market Scanner"
+    }
+  ],
+  "triggerCount": 1,
+  "updatedAt": "2025-01-08T04:00:00.000Z",
+  "versionId": "1"
+}

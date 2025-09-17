@@ -4,10 +4,10 @@ import { logger } from '@/lib/logger'
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ symbol: string }> }
+  { params }: any
 ) {
   try {
-    const { symbol } = await params
+    const { symbol } = params
     const { searchParams } = new URL(request.url)
     const interval = searchParams.get('interval') || '5m'
     

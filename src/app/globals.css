@@ -35,13 +35,13 @@
     --glass-surface: rgba(255, 255, 255, 0.05);
     --glass-border: rgba(255, 255, 255, 0.1);
     
-    /* Use base colors from @theme */
-    --bg-primary: var(--color-bg-primary);
-    --bg-secondary: var(--color-bg-secondary);
-    --bg-tertiary: var(--color-bg-tertiary);
-    --text-primary: var(--color-text-primary);
-    --text-secondary: var(--color-text-secondary);
-    --text-muted: var(--color-text-muted);
+    /* Professional theme colors - RGB values from tailwind.css */
+    --bg-primary: 10 11 20;
+    --bg-secondary: 0 0 0;
+    --bg-tertiary: 15 16 25;
+    --text-primary: 255 255 255;
+    --text-secondary: 209 213 219;
+    --text-muted: 156 163 175;
   }
 
   /* Synthwave Theme */
@@ -50,13 +50,13 @@
     --glass-surface: rgba(16, 0, 43, 0.85);
     --glass-border: rgba(255, 0, 110, 0.3);
     
-    /* Override theme colors for synthwave */
+    /* Override theme colors for synthwave - RGB values */
     --bg-primary: 16 0 43;
     --bg-secondary: 0 0 0;
     --bg-tertiary: 36 0 70;
-    --text-primary: var(--color-terminal-green);
-    --text-secondary: var(--color-neon-cyan);
-    --text-muted: var(--color-neon-purple);
+    --text-primary: 0 255 65;  /* terminal-green */
+    --text-secondary: 6 255 165; /* neon-cyan */
+    --text-muted: 131 56 236;   /* neon-purple */
     
     /* Neon Effects */
     --neon-glow: 0 0 20px rgba(255, 0, 110, 0.8);

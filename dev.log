@@ -1,0 +1,32 @@
+
+> trading-hub-v2@0.1.0 dev /Users/rajan/Documents/THub/THubV2/trading-hub-v2
+> next dev
+
+   ▲ Next.js 15.3.4
+   - Local:        http://localhost:3000
+   - Network:      http://192.168.1.81:3000
+   - Environments: .env.local
+
+ ✓ Starting...
+ ✓ Ready in 3.2s
+ ✓ Compiled /middleware in 336ms (109 modules)
+ ○ Compiling /api/health ...
+ ✓ Compiled /api/health in 1609ms (455 modules)
+ GET /api/health 200 in 1921ms
+ ○ Compiling /dev/testing ...
+[Error: Missing opening {]
+ ✓ Compiled /dev/testing in 3.8s (1923 modules)
+ ⨯ Error: useProgressiveEnhancementContext must be used within a ProgressiveEnhancementProvider
+    at useProgressiveEnhancementContext (src/components/providers/progressive-enhancement-provider.tsx:295:10)
+    at GlassCard (src/components/ui/glass-card.tsx:52:53)
+  293 |   const context = useContext(ProgressiveEnhancementContext);
+  294 |   if (!context) {
+> 295 |     throw new Error('useProgressiveEnhancementContext must be used within a ProgressiveEnhancementProvider');
+      |          ^
+  296 |   }
+  297 |   return context;
+  298 | } {
+  digest: '3753930981'
+}
+ GET /dev/testing 500 in 4104ms
+[?25h

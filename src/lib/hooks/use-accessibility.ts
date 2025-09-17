@@ -59,6 +59,11 @@ export function useAccessibility() {
 
   // Detect accessibility preferences
   useEffect(() => {
+    // Skip on server
+    if (typeof window === 'undefined') {
+      return;
+    }
+    
     const detectPreferences = () => {
       const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
       const prefersHighContrast = window.matchMedia('(prefers-contrast: high)').matches;
@@ -98,6 +103,11 @@ export function useAccessibility() {
 
   // Detect screen reader
   useEffect(() => {
+    // Skip on server
+    if (typeof window === 'undefined' || typeof navigator === 'undefined') {
+      return;
+    }
+    
     const detectScreenReader = () => {
       const userAgent = navigator.userAgent.toLowerCase();
       

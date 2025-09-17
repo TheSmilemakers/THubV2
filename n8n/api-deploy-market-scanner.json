@@ -1,0 +1,174 @@
+{
+  "name": "THub V2 - Market Scanner (API Deploy)",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 30
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Market Hours Schedule",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "market-hours-check",
+              "leftValue": "={{ $now.toFormat('HH:mm') }}",
+              "rightValue": "09:30",
+              "operator": {
+                "type": "dateTime",
+                "operation": "after"
+              }
+            },
+            {
+              "id": "market-close-check",
+              "leftValue": "={{ $now.toFormat('HH:mm') }}",
+              "rightValue": "16:00",
+              "operator": {
+                "type": "dateTime",
+                "operation": "before"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "market-status",
+      "name": "Is Market Open?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "try {\n  // Mock market conditions for testing\n  const mockVix = 22.5;\n  const mockVolume = 75000000;\n  \n  const adaptiveFilters = {\n    exchange: 'US',\n    minVolume: mockVix > 25 ? 2000000 : 1000000,\n    minPrice: 5,\n    maxPrice: 200,\n    minDailyChange: mockVix > 30 ? 3 : 2,\n    limit: 10\n  };\n\n  console.log('Adaptive filters applied:', adaptiveFilters);\n\n  return [{\n    json: {\n      filters: adaptiveFilters,\n      marketConditions: { vix: mockVix, volume: mockVolume },\n      timestamp: new Date().toISOString()\n    }\n  }];\n  \n} catch (error) {\n  return [{\n    json: {\n      filters: { exchange: 'US', limit: 5 },\n      error: error.message,\n      timestamp: new Date().toISOString()\n    }\n  }];\n}"
+      },
+      "id": "adaptive-filters",
+      "name": "Apply Adaptive Filters",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:3000/api/webhooks/n8n",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "json",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "action",
+              "value": "market_scan"
+            },
+            {
+              "name": "filters",
+              "value": "={{ $json.filters }}"
+            },
+            {
+              "name": "priority",
+              "value": "high"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "market-scan",
+      "name": "Execute Market Scan",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [850, 300],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "n8n-webhook-auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { success: true, message: 'Market scanner completed', timestamp: new Date().toISOString() } }}"
+      },
+      "id": "success-response",
+      "name": "Success Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1050, 300]
+    }
+  ],
+  "connections": {
+    "Market Hours Schedule": {
+      "main": [
+        [
+          {
+            "node": "Is Market Open?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Market Open?": {
+      "main": [
+        [
+          {
+            "node": "Apply Adaptive Filters",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Success Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Apply Adaptive Filters": {
+      "main": [
+        [
+          {
+            "node": "Execute Market Scan",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute Market Scan": {
+      "main": [
+        [
+          {
+            "node": "Success Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { Key, ArrowRight, AlertCircle, CheckCircle, Home } from 'lucide-react';
 import { GlassCard } from '@/components/ui/glass-card';
@@ -12,13 +12,27 @@ import { useTheme } from '@/lib/themes/use-theme';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
 
-export default function LoginPage() {
+function LoginContent() {
   const [token, setToken] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { theme } = useTheme();
+  
+  // Get redirect URL from search params
+  const redirectUrl = searchParams.get('redirect') || '/dashboard';
+  const errorFromUrl = searchParams.get('error');
+  
+  // Show error from URL if present
+  useEffect(() => {
+    if (errorFromUrl === 'authentication_required') {
+      setError('Please log in to access this page');
+    } else if (errorFromUrl === 'invalid_token') {
+      setError('Your session has expired. Please log in again');
+    }
+  }, [errorFromUrl]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -41,7 +55,7 @@ export default function LoginPage() {
       if (user) {
         setSuccess('Authentication successful! Redirecting...');
         setTimeout(() => {
-          router.push('/dashboard');
+          router.push(redirectUrl);
         }, 1000);
       } else {
         // Remove invalid token from storage
@@ -229,5 +243,30 @@ export default function LoginPage() {
         )}
       </GlassCard>
     </motion.div>
+  );
+}
+
+// Loading fallback for Suspense
+function LoginLoading() {
+  return (
+    <div className="w-full max-w-md mx-auto">
+      <GlassCard variant="prominent" className="p-8">
+        <div className="animate-pulse">
+          <div className="h-16 w-16 bg-white/10 rounded-full mx-auto mb-4" />
+          <div className="h-8 w-48 bg-white/10 rounded mx-auto mb-2" />
+          <div className="h-4 w-64 bg-white/10 rounded mx-auto mb-8" />
+          <div className="h-12 w-full bg-white/10 rounded mb-4" />
+          <div className="h-12 w-full bg-white/10 rounded" />
+        </div>
+      </GlassCard>
+    </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<LoginLoading />}>
+      <LoginContent />
+    </Suspense>
   );
 }

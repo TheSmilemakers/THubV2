@@ -1,0 +1,30 @@
+
+> trading-hub-v2@0.1.0 build /Users/rajan/Documents/THub/THubV2/trading-hub-v2
+> next build
+
+   ▲ Next.js 15.3.4
+   - Environments: .env.local, .env.production
+
+   Creating an optimized production build ...
+[Error: Missing opening {]
+ ✓ Compiled successfully in 13.0s
+   Linting and checking validity of types ...
+   Collecting page data ...
+   Generating static pages (0/17) ...
+   Generating static pages (4/17) 
+   Generating static pages (8/17) 
+Error occurred prerendering page "/dev/testing". Read more: https://nextjs.org/docs/messages/prerender-error
+Error: useProgressiveEnhancementContext must be used within a ProgressiveEnhancementProvider
+    at n (/Users/rajan/Documents/THub/THubV2/trading-hub-v2/.next/server/chunks/305.js:6:2030)
+    at /Users/rajan/Documents/THub/THubV2/trading-hub-v2/.next/server/chunks/305.js:6:13721
+    at nF (/Users/rajan/Documents/THub/THubV2/trading-hub-v2/node_modules/.pnpm/next@15.3.4_@babel+core@7.28.4_react-dom@19.1.1_react@19.1.1__react@19.1.1/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:76:46843)
+    at nH (/Users/rajan/Documents/THub/THubV2/trading-hub-v2/node_modules/.pnpm/next@15.3.4_@babel+core@7.28.4_react-dom@19.1.1_react@19.1.1__react@19.1.1/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:76:64045)
+    at nW (/Users/rajan/Documents/THub/THubV2/trading-hub-v2/node_modules/.pnpm/next@15.3.4_@babel+core@7.28.4_react-dom@19.1.1_react@19.1.1__react@19.1.1/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:76:67762)
+    at nz (/Users/rajan/Documents/THub/THubV2/trading-hub-v2/node_modules/.pnpm/next@15.3.4_@babel+core@7.28.4_react-dom@19.1.1_react@19.1.1__react@19.1.1/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:76:65337)
+    at nY (/Users/rajan/Documents/THub/THubV2/trading-hub-v2/node_modules/.pnpm/next@15.3.4_@babel+core@7.28.4_react-dom@19.1.1_react@19.1.1__react@19.1.1/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:76:71193)
+    at nX (/Users/rajan/Documents/THub/THubV2/trading-hub-v2/node_modules/.pnpm/next@15.3.4_@babel+core@7.28.4_react-dom@19.1.1_react@19.1.1__react@19.1.1/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:76:69876)
+    at nW (/Users/rajan/Documents/THub/THubV2/trading-hub-v2/node_modules/.pnpm/next@15.3.4_@babel+core@7.28.4_react-dom@19.1.1_react@19.1.1__react@19.1.1/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:76:68029)
+    at nz (/Users/rajan/Documents/THub/THubV2/trading-hub-v2/node_modules/.pnpm/next@15.3.4_@babel+core@7.28.4_react-dom@19.1.1_react@19.1.1__react@19.1.1/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:76:65337)
+Export encountered an error on /(dashboard)/dev/testing/page: /dev/testing, exiting the build.
+ ⨯ Next.js build worker exited with code: 1 and signal: null
+ ELIFECYCLE  Command failed with exit code 1.

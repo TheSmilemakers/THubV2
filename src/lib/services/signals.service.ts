@@ -60,7 +60,11 @@ export class SignalsService {
         query = query.lte('convergence_score', filters.max_score)
       }
       
-      if (filters.symbol) {
+      // Handle both single symbol and array of symbols
+      if (filters.symbols && filters.symbols.length > 0) {
+        query = query.in('symbol', filters.symbols)
+      } else if (filters.symbol) {
+        // Backward compatibility with single symbol
         query = query.ilike('symbol', `%${filters.symbol}%`)
       }
       

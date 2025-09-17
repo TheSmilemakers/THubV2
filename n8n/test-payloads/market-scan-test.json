@@ -1,0 +1,84 @@
+{
+  "test_cases": [
+    {
+      "name": "Small Batch Test",
+      "description": "Test with limited symbols for quick validation",
+      "payload": {
+        "action": "market_scan",
+        "filters": {
+          "limit": 5,
+          "minVolume": 1000000,
+          "minDailyChange": 2
+        },
+        "metadata": {
+          "test": true,
+          "source": "manual_test"
+        }
+      }
+    },
+    {
+      "name": "High Volatility Test",
+      "description": "Test with high volatility market conditions",
+      "payload": {
+        "action": "market_scan",
+        "filters": {
+          "minVolume": 2000000,
+          "minDailyChange": 3,
+          "limit": 50
+        },
+        "metadata": {
+          "marketConditions": {
+            "vix": 30,
+            "trend": "volatile"
+          }
+        }
+      }
+    },
+    {
+      "name": "Sector Exclusion Test",
+      "description": "Test sector filtering functionality",
+      "payload": {
+        "action": "market_scan",
+        "filters": {
+          "excludeSectors": ["REIT", "ADR", "Finance"],
+          "limit": 20
+        }
+      }
+    },
+    {
+      "name": "Price Range Test",
+      "description": "Test price range filtering",
+      "payload": {
+        "action": "market_scan",
+        "filters": {
+          "minPrice": 10,
+          "maxPrice": 100,
+          "limit": 15
+        }
+      }
+    }
+  ],
+  "batch_analysis_test": {
+    "name": "Batch Analysis Test",
+    "payload": {
+      "action": "batch_analyze",
+      "symbols": ["AAPL", "GOOGL", "MSFT", "TSLA", "NVDA"],
+      "priority": "high",
+      "metadata": {
+        "source": "test_batch",
+        "opportunityScores": [
+          {"symbol": "AAPL", "score": 75},
+          {"symbol": "GOOGL", "score": 82},
+          {"symbol": "MSFT", "score": 68},
+          {"symbol": "TSLA", "score": 91},
+          {"symbol": "NVDA", "score": 79}
+        ]
+      }
+    }
+  },
+  "curl_commands": {
+    "market_scan": "curl -X POST http://localhost:3000/api/webhooks/n8n -H 'Authorization: Bearer thub_v2_webhook_secret_2024_secure_key' -H 'Content-Type: application/json' -d '{\"action\":\"market_scan\",\"filters\":{\"limit\":5}}'",
+    "batch_analyze": "curl -X POST http://localhost:3000/api/webhooks/n8n -H 'Authorization: Bearer thub_v2_webhook_secret_2024_secure_key' -H 'Content-Type: application/json' -d '{\"action\":\"batch_analyze\",\"symbols\":[\"AAPL\",\"MSFT\"]}'",
+    "market_overview": "curl -X POST http://localhost:3000/api/webhooks/n8n -H 'Authorization: Bearer thub_v2_webhook_secret_2024_secure_key' -H 'Content-Type: application/json' -d '{\"action\":\"market_overview\"}'"
+  }
+}

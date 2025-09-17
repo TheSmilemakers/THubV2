@@ -4,6 +4,8 @@ import { z } from 'zod';
 import { logger } from '@/lib/logger';
 import { withRateLimit, RATE_LIMIT_CONFIGS } from '@/lib/middleware/rate-limit';
 import { stockSymbolSchema } from '@/lib/validation/schemas';
+import { createClient } from '@/lib/supabase/server';
+import { getCacheService } from '@/lib/services/cache.service';
 
 // Input validation schema
 const QuerySchema = z.object({
@@ -39,6 +41,10 @@ export const GET = withRateLimit(
     }
 
     requestLogger.info(`Starting analysis for symbol: ${symbol}`);
+
+    // Ensure cache service is initialized with a server client (prevents singleton init errors)
+    const supabase = await createClient();
+    getCacheService(supabase);
 
     // Initialize coordinator and run analysis
     const coordinator = new AnalysisCoordinator();

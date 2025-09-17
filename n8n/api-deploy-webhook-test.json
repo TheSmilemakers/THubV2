@@ -1,0 +1,73 @@
+{
+  "name": "THub V2 - Webhook Test",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "thub-test",
+        "responseMode": "onReceived",
+        "options": {
+          "noResponseBody": false
+        }
+      },
+      "id": "webhook-1234-5678-9abc-def012345678",
+      "name": "Test Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [250, 300],
+      "webhookId": "thub-test"
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "try {\n  const input = $input.first();\n  const data = input ? input.json : {};\n  \n  console.log('=== THub V2 Webhook Test ===');\n  console.log('Received data:', JSON.stringify(data, null, 2));\n  \n  // Test different actions\n  let response = {\n    received: data,\n    timestamp: new Date().toISOString(),\n    webhook: 'working',\n    test: 'success'\n  };\n  \n  if (data.action === 'market_scan') {\n    response.mockScan = {\n      totalScanned: 11000,\n      filtered: 450,\n      queued: data.filters?.limit || 10,\n      candidates: [\n        { symbol: 'AAPL', score: 75 },\n        { symbol: 'MSFT', score: 82 },\n        { symbol: 'GOOGL', score: 68 }\n      ]\n    };\n  }\n  \n  console.log('Response:', JSON.stringify(response, null, 2));\n  \n  return [{ json: response }];\n  \n} catch (error) {\n  console.error('Webhook test error:', error.message);\n  \n  return [{\n    json: {\n      error: error.message,\n      timestamp: new Date().toISOString(),\n      webhook: 'error'\n    }\n  }];\n}"
+      },
+      "id": "process-9876-5432-1abc-def012345678",
+      "name": "Process Test Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "response-5432-9876-1def-abc012345678",
+      "name": "Send Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [650, 300]
+    }
+  ],
+  "connections": {
+    "Test Webhook": {
+      "main": [
+        [
+          {
+            "node": "Process Test Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Test Data": {
+      "main": [
+        [
+          {
+            "node": "Send Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

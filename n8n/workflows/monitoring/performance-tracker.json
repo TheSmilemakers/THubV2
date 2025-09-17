@@ -1,0 +1,229 @@
+{
+  "name": "THub V2 - Performance Tracker",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "30 16 * * 1-5"
+            }
+          ]
+        }
+      },
+      "id": "daily-trigger",
+      "name": "Daily at Market Close",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 3,
+      "position": [250, 300],
+      "notes": "Runs at 4:30 PM EST every weekday"
+    },
+    {
+      "parameters": {
+        "language": "js",
+        "jsCode": "// Calculate date range for today's performance\nconst now = new Date();\nconst todayStart = new Date(now);\ntodayStart.setHours(0, 0, 0, 0);\n\nconst todayEnd = new Date(now);\ntodayEnd.setHours(23, 59, 59, 999);\n\nreturn {\n  dateRange: {\n    start: todayStart.toISOString(),\n    end: todayEnd.toISOString(),\n    date: now.toISOString().split('T')[0]\n  },\n  metrics: {\n    scanMetrics: true,\n    signalMetrics: true,\n    apiMetrics: true,\n    errorMetrics: true\n  }\n};"
+      },
+      "id": "prepare-metrics",
+      "name": "Prepare Metrics Query",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.APP_URL }}/api/internal/metrics",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "type",
+              "value": "daily_performance"
+            },
+            {
+              "name": "dateRange",
+              "value": "={{ $json.dateRange }}"
+            },
+            {
+              "name": "includeMetrics",
+              "value": "={{ $json.metrics }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "get-metrics",
+      "name": "Get Performance Metrics",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [650, 300],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "n8n-webhook-auth",
+          "name": "n8n Webhook Auth"
+        }
+      },
+      "notes": "This would connect to a metrics endpoint (to be implemented)"
+    },
+    {
+      "parameters": {
+        "language": "js",
+        "jsCode": "// Process and analyze performance metrics\n// For now, we'll create sample metrics structure\nconst date = $node['Prepare Metrics Query'].json.dateRange.date;\n\n// Simulated metrics (replace with actual data from metrics endpoint)\nconst performanceData = {\n  date: date,\n  scanMetrics: {\n    totalScans: 16,  // Every 30 mins from 9:30-4:00\n    successfulScans: 15,\n    failedScans: 1,\n    averageScanTime: 3.2,  // seconds\n    totalSymbolsScanned: 165000,\n    totalCandidatesFound: 412,\n    averageCandidatesPerScan: 25.75\n  },\n  signalMetrics: {\n    signalsGenerated: 42,\n    strongSignals: 12,\n    mediumSignals: 18,\n    weakSignals: 12,\n    averageScore: 72.3,\n    conversionRate: 10.2  // % of candidates that became signals\n  },\n  apiMetrics: {\n    totalCalls: 890,\n    bulkEODCalls: 16,\n    individualCalls: 874,\n    dailyLimitUsed: 44.5,  // percentage\n    costEstimate: 8.90  // dollars\n  },\n  errorMetrics: {\n    totalErrors: 3,\n    apiErrors: 1,\n    timeoutErrors: 1,\n    validationErrors: 1,\n    errorRate: 1.8  // percentage\n  },\n  qualityMetrics: {\n    scanToSignalRatio: 0.102,\n    highValueSignalRatio: 0.286,\n    averageOpportunityScore: 68.5,\n    filterEffectiveness: 0.85\n  }\n};\n\n// Calculate performance scores\nconst performanceScore = {\n  efficiency: (performanceData.scanMetrics.successfulScans / performanceData.scanMetrics.totalScans) * 100,\n  quality: (performanceData.signalMetrics.strongSignals / performanceData.signalMetrics.signalsGenerated) * 100,\n  reliability: 100 - performanceData.errorMetrics.errorRate,\n  overall: 0\n};\n\nperformanceScore.overall = (\n  performanceScore.efficiency * 0.3 +\n  performanceScore.quality * 0.5 +\n  performanceScore.reliability * 0.2\n).toFixed(1);\n\n// Identify trends and insights\nconst insights = [];\n\nif (performanceData.signalMetrics.conversionRate > 10) {\n  insights.push({\n    type: 'positive',\n    message: 'High conversion rate indicates effective filtering'\n  });\n}\n\nif (performanceData.errorMetrics.errorRate > 5) {\n  insights.push({\n    type: 'warning',\n    message: 'Error rate exceeds 5% threshold - investigation needed'\n  });\n}\n\nif (performanceData.apiMetrics.dailyLimitUsed > 80) {\n  insights.push({\n    type: 'warning',\n    message: 'Approaching API rate limits - consider optimization'\n  });\n}\n\nreturn {\n  performanceData: performanceData,\n  performanceScore: performanceScore,\n  insights: insights\n};"
+      },
+      "id": "analyze-performance",
+      "name": "Analyze Performance",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "language": "js",
+        "jsCode": "// Create performance report\nconst data = $json.performanceData;\nconst score = $json.performanceScore;\nconst insights = $json.insights;\n\n// Format report sections\nconst report = {\n  summary: `📊 Daily Performance Report - ${data.date}\\n` +\n    `Overall Score: ${score.overall}/100\\n\\n` +\n    `✅ Scans: ${data.scanMetrics.successfulScans}/${data.scanMetrics.totalScans}\\n` +\n    `📈 Signals: ${data.signalMetrics.signalsGenerated} (${data.signalMetrics.strongSignals} strong)\\n` +\n    `⚡ API Usage: ${data.apiMetrics.dailyLimitUsed}%\\n` +\n    `❌ Errors: ${data.errorMetrics.totalErrors} (${data.errorMetrics.errorRate}%)`,\n  \n  detailed: {\n    scanPerformance: {\n      title: 'Scan Performance',\n      metrics: [\n        `Total Scans: ${data.scanMetrics.totalScans}`,\n        `Success Rate: ${((data.scanMetrics.successfulScans / data.scanMetrics.totalScans) * 100).toFixed(1)}%`,\n        `Avg Scan Time: ${data.scanMetrics.averageScanTime}s`,\n        `Symbols Scanned: ${data.scanMetrics.totalSymbolsScanned.toLocaleString()}`,\n        `Candidates Found: ${data.scanMetrics.totalCandidatesFound}`,\n        `Avg per Scan: ${data.scanMetrics.averageCandidatesPerScan.toFixed(1)}`\n      ]\n    },\n    signalQuality: {\n      title: 'Signal Quality',\n      metrics: [\n        `Total Signals: ${data.signalMetrics.signalsGenerated}`,\n        `Strong: ${data.signalMetrics.strongSignals} (${((data.signalMetrics.strongSignals / data.signalMetrics.signalsGenerated) * 100).toFixed(1)}%)`,\n        `Average Score: ${data.signalMetrics.averageScore.toFixed(1)}`,\n        `Conversion Rate: ${data.signalMetrics.conversionRate.toFixed(1)}%`\n      ]\n    },\n    resourceUsage: {\n      title: 'Resource Usage',\n      metrics: [\n        `API Calls: ${data.apiMetrics.totalCalls}`,\n        `Daily Limit Used: ${data.apiMetrics.dailyLimitUsed}%`,\n        `Estimated Cost: $${data.apiMetrics.costEstimate.toFixed(2)}`\n      ]\n    }\n  },\n  \n  insights: insights,\n  \n  recommendations: []\n};\n\n// Add recommendations based on performance\nif (data.signalMetrics.conversionRate < 5) {\n  report.recommendations.push('Consider tightening filters to improve signal quality');\n}\n\nif (data.scanMetrics.averageScanTime > 5) {\n  report.recommendations.push('Optimize scan queries to reduce execution time');\n}\n\nif (data.apiMetrics.dailyLimitUsed > 70) {\n  report.recommendations.push('Implement more aggressive caching to reduce API usage');\n}\n\nreturn report;"
+      },
+      "id": "create-report",
+      "name": "Create Performance Report",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1050, 300]
+    },
+    {
+      "parameters": {
+        "channel": "#performance-reports",
+        "text": "={{ $json.summary }}",
+        "attachments": [
+          {
+            "color": "#0099ff",
+            "title": "{{ $json.detailed.scanPerformance.title }}",
+            "text": "={{ $json.detailed.scanPerformance.metrics.join('\\n') }}"
+          },
+          {
+            "color": "#00ff00",
+            "title": "{{ $json.detailed.signalQuality.title }}",
+            "text": "={{ $json.detailed.signalQuality.metrics.join('\\n') }}"
+          },
+          {
+            "color": "#ff9900",
+            "title": "{{ $json.detailed.resourceUsage.title }}",
+            "text": "={{ $json.detailed.resourceUsage.metrics.join('\\n') }}"
+          },
+          {
+            "color": "={{ $json.insights.some(i => i.type === 'warning') ? '#ff0000' : '#999999' }}",
+            "title": "Insights & Recommendations",
+            "text": "={{ $json.insights.map(i => `${i.type === 'warning' ? '⚠️' : '✅'} ${i.message}`).concat($json.recommendations.map(r => `💡 ${r}`)).join('\\n') }}",
+            "footer": "THub V2 Performance Tracker",
+            "ts": "={{ Math.floor($now.toSeconds()) }}"
+          }
+        ],
+        "otherOptions": {}
+      },
+      "id": "send-report",
+      "name": "Send Performance Report",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.1,
+      "position": [1250, 300]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $env.PERFORMANCE_SHEET_ID }}",
+          "mode": "id"
+        },
+        "sheetName": "Daily Performance",
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "date": "={{ $node['Analyze Performance'].json.performanceData.date }}",
+            "overallScore": "={{ $node['Analyze Performance'].json.performanceScore.overall }}",
+            "totalScans": "={{ $node['Analyze Performance'].json.performanceData.scanMetrics.totalScans }}",
+            "successfulScans": "={{ $node['Analyze Performance'].json.performanceData.scanMetrics.successfulScans }}",
+            "signalsGenerated": "={{ $node['Analyze Performance'].json.performanceData.signalMetrics.signalsGenerated }}",
+            "strongSignals": "={{ $node['Analyze Performance'].json.performanceData.signalMetrics.strongSignals }}",
+            "apiUsage": "={{ $node['Analyze Performance'].json.performanceData.apiMetrics.dailyLimitUsed }}",
+            "errorRate": "={{ $node['Analyze Performance'].json.performanceData.errorMetrics.errorRate }}",
+            "conversionRate": "={{ $node['Analyze Performance'].json.performanceData.signalMetrics.conversionRate }}"
+          }
+        }
+      },
+      "id": "log-performance",
+      "name": "Log to Spreadsheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [1250, 500]
+    }
+  ],
+  "connections": {
+    "Daily at Market Close": {
+      "main": [
+        [
+          {
+            "node": "Prepare Metrics Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Metrics Query": {
+      "main": [
+        [
+          {
+            "node": "Get Performance Metrics",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Performance Metrics": {
+      "main": [
+        [
+          {
+            "node": "Analyze Performance",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analyze Performance": {
+      "main": [
+        [
+          {
+            "node": "Create Performance Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Performance Report": {
+      "main": [
+        [
+          {
+            "node": "Send Performance Report",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Log to Spreadsheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner"
+  }
+}

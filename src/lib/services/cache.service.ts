@@ -314,6 +314,7 @@ let cacheServiceInstance: CacheService | null = null;
 
 /**
  * Get singleton cache service instance
+ * Allows updating the Supabase client for server-side usage
  */
 export function getCacheService(supabaseClient?: SupabaseClient): CacheService {
   if (!cacheServiceInstance) {
@@ -321,6 +322,37 @@ export function getCacheService(supabaseClient?: SupabaseClient): CacheService {
       throw new Error('Supabase client required for initial cache service creation');
     }
     cacheServiceInstance = new CacheService(supabaseClient);
+  } else if (supabaseClient && cacheServiceInstance) {
+    // Update the client if a new one is provided
+    // This allows server-side routes to use their own authenticated client
+    (cacheServiceInstance as any).supabase = supabaseClient;
   }
   return cacheServiceInstance;
+}
+
+/**
+ * Alternative: Factory pattern for better isolation
+ * Use this in server-side routes where client isolation is important
+ */
+export class CacheServiceFactory {
+  private static instances = new Map<string, CacheService>();
+  
+  static getInstance(key: string, supabaseClient: SupabaseClient): CacheService {
+    const existing = this.instances.get(key);
+    if (existing) {
+      return existing;
+    }
+    
+    const instance = new CacheService(supabaseClient);
+    this.instances.set(key, instance);
+    return instance;
+  }
+  
+  static clearInstance(key: string): void {
+    this.instances.delete(key);
+  }
+  
+  static clearAll(): void {
+    this.instances.clear();
+  }
 }

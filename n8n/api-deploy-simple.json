@@ -1,0 +1,129 @@
+{
+  "name": "THub V2 - Market Scanner (REPAIRED)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 30
+            }
+          ]
+        }
+      },
+      "id": "c8a0ef7a-1234-5678-9abc-def012345678",
+      "name": "Market Hours Schedule",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "market-hours-check",
+              "leftValue": "={{ $now.toFormat('HH:mm') }}",
+              "rightValue": "09:30",
+              "operator": {
+                "type": "dateTime",
+                "operation": "after"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "b7f0de9c-2345-6789-abcd-ef0123456789",
+      "name": "Is Market Open?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "try {\n  const mockFilters = {\n    exchange: 'US',\n    minVolume: 1000000,\n    minPrice: 5,\n    limit: 10\n  };\n\n  console.log('THub V2 Market Scanner - Filters applied:', mockFilters);\n\n  return [{\n    json: {\n      filters: mockFilters,\n      success: true,\n      timestamp: new Date().toISOString(),\n      message: 'Market scanner workflow is working!'\n    }\n  }];\n  \n} catch (error) {\n  return [{\n    json: {\n      error: error.message,\n      success: false,\n      timestamp: new Date().toISOString()\n    }\n  }];\n}"
+      },
+      "id": "a6e9dc8b-3456-789a-bcde-f01234567890",
+      "name": "Apply Filters & Test",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [650, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:3000/api/webhooks/n8n",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer thub_v2_webhook_secret_2024_secure_key"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "jsonBody": "={\n  \"action\": \"market_scan\",\n  \"filters\": {{ $json.filters | json }},\n  \"priority\": \"high\",\n  \"test\": true,\n  \"source\": \"n8n_workflow\"\n}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "95d8cb7a-4567-89ab-cdef-012345678901",
+      "name": "Test THub API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [850, 200]
+    }
+  ],
+  "connections": {
+    "Market Hours Schedule": {
+      "main": [
+        [
+          {
+            "node": "Is Market Open?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Market Open?": {
+      "main": [
+        [
+          {
+            "node": "Apply Filters & Test",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Apply Filters & Test": {
+      "main": [
+        [
+          {
+            "node": "Test THub API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

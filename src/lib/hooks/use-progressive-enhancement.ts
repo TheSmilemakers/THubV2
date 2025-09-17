@@ -9,7 +9,7 @@
  * - User preference overrides
  * - Accessibility-first approach
  */
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useDeviceCapabilities } from './use-device-capabilities';
 
 export interface ProgressiveEnhancementConfig {
@@ -146,6 +146,7 @@ const ENHANCEMENT_TIERS: Record<string, EnhancementTier> = {
 };
 
 export function useProgressiveEnhancement() {
+  const [mounted, setMounted] = useState(false);
   const deviceCapabilities = useDeviceCapabilities();
   const [networkCapabilities, setNetworkCapabilities] = useState<NetworkCapabilities>({
     type: 'unknown',
@@ -162,9 +163,19 @@ export function useProgressiveEnhancement() {
   });
   const [currentTier, setCurrentTier] = useState<EnhancementTier>(ENHANCEMENT_TIERS.standard);
   const [config, setConfig] = useState<ProgressiveEnhancementConfig>(ENHANCEMENT_TIERS.standard.config);
+  
+  // Set mounted flag
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Detect network capabilities
   useEffect(() => {
+    // Skip on server
+    if (typeof window === 'undefined' || typeof navigator === 'undefined') {
+      return;
+    }
+    
     const updateNetworkInfo = () => {
       const connection = (navigator as any).connection || (navigator as any).mozConnection || (navigator as any).webkitConnection;
       
@@ -189,6 +200,11 @@ export function useProgressiveEnhancement() {
 
   // Detect user preferences
   useEffect(() => {
+    // Skip on server
+    if (typeof window === 'undefined') {
+      return;
+    }
+    
     const mediaQueries = {
       reducedMotion: window.matchMedia('(prefers-reduced-motion: reduce)'),
       highContrast: window.matchMedia('(prefers-contrast: high)'),
@@ -218,8 +234,10 @@ export function useProgressiveEnhancement() {
     };
   }, []);
 
-  // Calculate optimal enhancement tier
-  const calculateOptimalTier = useCallback((): EnhancementTier => {
+
+  // Update tier when dependencies change
+  useEffect(() => {
+    // Calculate optimal tier inline to avoid dependency issues
     let score = 0;
 
     // Device capability scoring
@@ -253,15 +271,12 @@ export function useProgressiveEnhancement() {
     if (deviceCapabilities.screenSize === 'desktop') score += 1;
 
     // Determine tier based on score
-    if (score >= 8) return ENHANCEMENT_TIERS.premium;
-    if (score >= 5) return ENHANCEMENT_TIERS.enhanced;
-    if (score >= 2) return ENHANCEMENT_TIERS.standard;
-    return ENHANCEMENT_TIERS.minimal;
-  }, [deviceCapabilities, networkCapabilities, userPreferences]);
+    let optimalTier: EnhancementTier;
+    if (score >= 8) optimalTier = ENHANCEMENT_TIERS.premium;
+    else if (score >= 5) optimalTier = ENHANCEMENT_TIERS.enhanced;
+    else if (score >= 2) optimalTier = ENHANCEMENT_TIERS.standard;
+    else optimalTier = ENHANCEMENT_TIERS.minimal;
 
-  // Update tier when dependencies change
-  useEffect(() => {
-    const optimalTier = calculateOptimalTier();
     setCurrentTier(optimalTier);
     
     // Apply user preference overrides to config
@@ -289,7 +304,7 @@ export function useProgressiveEnhancement() {
     }
 
     setConfig(adjustedConfig);
-  }, [calculateOptimalTier, userPreferences, networkCapabilities]);
+  }, [deviceCapabilities, userPreferences, networkCapabilities]);
 
   // Manual tier override
   const setTier = useCallback((tierName: keyof typeof ENHANCEMENT_TIERS) => {
@@ -343,13 +358,14 @@ export function useProgressiveEnhancement() {
     }
   }, [config.imageOptimization]);
 
-  return {
+  return useMemo(() => ({
     // Current state
     currentTier,
     config,
     networkCapabilities,
     userPreferences,
     deviceCapabilities,
+    isLoading: !mounted,
     
     // Control methods
     setTier,
@@ -371,7 +387,26 @@ export function useProgressiveEnhancement() {
     
     // Available tiers
     availableTiers: Object.values(ENHANCEMENT_TIERS),
-  };
+  }), [
+    currentTier,
+    config,
+    networkCapabilities,
+    userPreferences,
+    deviceCapabilities,
+    mounted,
+    setTier,
+    updateConfig,
+    setUserPreferences,
+    shouldUseAnimations,
+    shouldUseGlassmorphism,
+    shouldUseParticleEffects,
+    shouldUseHardwareAcceleration,
+    shouldAutoRefresh,
+    shouldPrefetch,
+    getAnimationClass,
+    getGlassClass,
+    getImageFormat,
+  ]);
 }
 
 /**

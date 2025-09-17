@@ -31,20 +31,12 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Initialize theme on server side to prevent flash
+  const initialTheme = 'professional'; // Default theme
+  
   return (
-    <html lang="en" className="dark" suppressHydrationWarning>
-      <head>
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              (function() {
-                const theme = localStorage.getItem('thub-theme') || 'professional';
-                document.documentElement.setAttribute('data-theme', theme);
-              })();
-            `,
-          }}
-        />
-      </head>
+    <html lang="en" className="dark" suppressHydrationWarning data-theme={initialTheme}>
+      <head />
       <body
         className={`${inter.variable} ${jetbrainsMono.variable} ${firaCode.variable} font-sans antialiased`}
       >

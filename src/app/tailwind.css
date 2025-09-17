@@ -255,9 +255,9 @@
 
   /* Focus indicators */
   .focus-visible-enhanced:focus-visible {
-    outline: 3px solid rgb(var(--accent-primary));
+    outline: 3px solid rgb(var(--color-primary));
     outline-offset: 2px;
-    box-shadow: 0 0 0 6px rgba(var(--accent-primary), 0.2);
+    box-shadow: 0 0 0 6px rgba(var(--color-primary), 0.2);
   }
 
   /* Touch target sizes */
@@ -273,7 +273,7 @@
 
   /* Keyboard navigation indicators */
   .keyboard-nav-active {
-    outline: 2px solid rgb(var(--accent-primary));
+    outline: 2px solid rgb(var(--color-primary));
     outline-offset: 2px;
   }
 
@@ -282,20 +282,22 @@
     position: absolute;
     top: -40px;
     left: 6px;
-    background: rgb(var(--background-primary));
+    background: rgb(var(--bg-primary));
     color: rgb(var(--text-primary));
     padding: 8px;
     text-decoration: none;
     border-radius: 4px;
-    border: 2px solid rgb(var(--accent-primary));
+    border: 2px solid rgb(var(--color-primary));
     z-index: 9999;
   }
 
   .skip-link:focus {
     top: 6px;
   }
-    
-  .glass-mobile-mid {
+  
+  /* Mobile Glass Effect Variants */
+  @media (max-width: 768px) {
+    .glass-mobile-mid {
       background: rgba(255, 255, 255, 0.06);
       border: 1px solid rgba(255, 255, 255, 0.1);
       backdrop-filter: blur(12px);
@@ -455,21 +457,21 @@
 
   /* High contrast mode support */
   .high-contrast {
-    --glass-surface: rgb(var(--background-primary));
+    --glass-surface: rgb(var(--bg-primary));
     --glass-border: currentColor;
   }
 
   .high-contrast .glass-card,
   .high-contrast .glass-surface {
     border: 3px solid currentColor;
-    background: rgb(var(--background-primary));
+    background: rgb(var(--bg-primary));
     backdrop-filter: none;
   }
 
   .high-contrast .btn-primary,
   .high-contrast .btn-glass {
     border: 2px solid currentColor;
-    background: rgb(var(--background-primary));
+    background: rgb(var(--bg-primary));
   }
 
   .high-contrast .text-text-secondary {

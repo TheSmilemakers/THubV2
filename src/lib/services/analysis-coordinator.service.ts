@@ -113,8 +113,9 @@ export class AnalysisCoordinator {
 
       const analysisTime = Date.now() - startTime;
       const finalStats = this.rateLimiter.getStats();
-      const apiCallsUsed = (initialStats.minute.used - finalStats.minute.used) + 
-                          (initialStats.daily.used - finalStats.daily.used);
+      const minuteDelta = Math.max(0, finalStats.minute.used - initialStats.minute.used);
+      const dailyDelta = Math.max(0, finalStats.daily.used - initialStats.daily.used);
+      const apiCallsUsed = minuteDelta + dailyDelta;
 
       this.logger.info(
         `Analysis completed for ${symbol} in ${analysisTime}ms. Score: ${convergence.score}`,
@@ -153,7 +154,7 @@ export class AnalysisCoordinator {
         signal,
         metrics: {
           analysisTime,
-          apiCallsUsed: Math.abs(apiCallsUsed),
+          apiCallsUsed: apiCallsUsed,
           cacheHits: 0 // TODO: Track cache hits from services
         }
       };

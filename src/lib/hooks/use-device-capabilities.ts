@@ -41,6 +41,11 @@ export function useDeviceCapabilities(): DeviceCapabilities {
   });
 
   useEffect(() => {
+    // Skip detection on server
+    if (typeof window === 'undefined') {
+      return;
+    }
+    
     const detectCapabilities = () => {
       // GPU tier detection via WebGL
       const canvas = document.createElement('canvas');

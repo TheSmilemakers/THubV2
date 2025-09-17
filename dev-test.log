@@ -1,0 +1,24 @@
+
+> trading-hub-v2@0.1.0 dev /Users/rajan/Documents/THub/THubV2/trading-hub-v2
+> next dev
+
+   ▲ Next.js 15.3.4
+   - Local:        http://localhost:3000
+   - Network:      http://192.168.1.81:3000
+   - Environments: .env.local
+
+ ✓ Starting...
+ ✓ Ready in 2.1s
+ ✓ Compiled /middleware in 180ms (109 modules)
+ ○ Compiling /dev/testing ...
+ ✓ Compiled /dev/testing in 1877ms (1774 modules)
+ GET /dev/testing 200 in 2806ms
+ ○ Compiling /login ...
+ ✓ Compiled /login in 1745ms (1899 modules)
+ GET /login 200 in 2100ms
+ ○ Compiling /dashboard ...
+ ✓ Compiled /dashboard in 570ms (1968 modules)
+ GET /dashboard 200 in 878ms
+ ✓ Compiled /showcase in 306ms (1989 modules)
+ GET /showcase 200 in 482ms
+[?25h

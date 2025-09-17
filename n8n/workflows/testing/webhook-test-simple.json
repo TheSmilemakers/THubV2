@@ -1,0 +1,173 @@
+{
+  "name": "THub V2 - Webhook Test (Simple)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "test-webhook",
+        "responseMode": "onReceived",
+        "responseData": "firstEntryJson",
+        "options": {
+          "noResponseBody": false
+        }
+      },
+      "id": "test-webhook",
+      "name": "Test Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [250, 300],
+      "webhookId": "test-webhook",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "try {\n  const input = $input.first();\n  const data = input ? input.json : {};\n  \n  console.log('Test webhook received data:', JSON.stringify(data, null, 2));\n  \n  // Simulate a simple market scan test\n  const testResult = {\n    action: data.action || 'unknown',\n    timestamp: new Date().toISOString(),\n    received: data,\n    test: {\n      success: true,\n      message: 'Webhook test successful',\n      filters: data.filters || {},\n      symbolCount: data.symbols ? data.symbols.length : 0\n    }\n  };\n  \n  console.log('Test result:', JSON.stringify(testResult, null, 2));\n  \n  return [{ json: testResult }];\n  \n} catch (error) {\n  console.error('Test webhook error:', error.message);\n  \n  return [{\n    json: {\n      success: false,\n      error: error.message,\n      timestamp: new Date().toISOString()\n    }\n  }];\n}"
+      },
+      "id": "process-test",
+      "name": "Process Test",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [450, 300],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "action-check",
+              "leftValue": "={{ $json.action }}",
+              "rightValue": "market_scan",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        }
+      },
+      "id": "check-action",
+      "name": "Is Market Scan?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [650, 300],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "try {\n  const input = $input.first();\n  const data = input ? input.json : {};\n  \n  // Mock a market scan response\n  const mockCandidates = [\n    {\n      symbol: 'AAPL',\n      price: 150.25,\n      changePercent: 2.4,\n      volume: 45000000,\n      opportunityScore: 75\n    },\n    {\n      symbol: 'MSFT', \n      price: 380.50,\n      changePercent: 1.8,\n      volume: 32000000,\n      opportunityScore: 68\n    },\n    {\n      symbol: 'GOOGL',\n      price: 2800.75,\n      changePercent: 3.2,\n      volume: 28000000,\n      opportunityScore: 82\n    }\n  ];\n  \n  const mockResponse = {\n    success: true,\n    action: 'market_scan',\n    summary: {\n      totalScanned: 11000,\n      filtered: 450,\n      queued: 3,\n      executionTime: 3.2\n    },\n    candidates: mockCandidates,\n    scanId: 'test-' + Date.now(),\n    timestamp: new Date().toISOString(),\n    metadata: data.received.metadata || {}\n  };\n  \n  console.log('Mock market scan response:', JSON.stringify(mockResponse, null, 2));\n  \n  return [{ json: mockResponse }];\n  \n} catch (error) {\n  console.error('Mock scan error:', error.message);\n  \n  return [{\n    json: {\n      success: false,\n      error: error.message,\n      timestamp: new Date().toISOString()\n    }\n  }];\n}"
+      },
+      "id": "mock-scan",
+      "name": "Mock Market Scan",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [850, 200],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "respond-success",
+      "name": "Success Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1050, 200]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "respond-other",
+      "name": "Other Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [850, 400]
+    }
+  ],
+  "connections": {
+    "Test Webhook": {
+      "main": [
+        [
+          {
+            "node": "Process Test",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Test": {
+      "main": [
+        [
+          {
+            "node": "Is Market Scan?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Market Scan?": {
+      "main": [
+        [
+          {
+            "node": "Mock Market Scan",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Other Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mock Market Scan": {
+      "main": [
+        [
+          {
+            "node": "Success Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "staticData": null,
+  "tags": [
+    {
+      "createdAt": "2025-01-08T04:00:00.000Z",
+      "updatedAt": "2025-01-08T04:00:00.000Z",
+      "id": "4",
+      "name": "Testing"
+    }
+  ],
+  "triggerCount": 1,
+  "updatedAt": "2025-01-08T04:00:00.000Z",
+  "versionId": "1"
+}

@@ -51,7 +51,8 @@ export interface SignalFilters {
   signal_strength?: SignalStrength[]
   min_score?: number
   max_score?: number
-  symbol?: string
+  symbol?: string // @deprecated Use symbols instead
+  symbols?: string[] // Array of symbols to filter by
   saved?: boolean
   viewed?: boolean
   active?: boolean

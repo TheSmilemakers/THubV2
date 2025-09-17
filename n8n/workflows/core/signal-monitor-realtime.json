@@ -1,0 +1,277 @@
+{
+  "name": "THub V2 - Signal Monitor Real-time",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 15
+            }
+          ]
+        }
+      },
+      "id": "monitor-trigger",
+      "name": "Monitor Schedule",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 3,
+      "position": [250, 300],
+      "notes": "Runs every 15 minutes to update signal prices"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.APP_URL }}/api/webhooks/n8n",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "action",
+              "value": "market_overview"
+            },
+            {
+              "name": "metadata",
+              "value": "={{ { source: 'signal_monitor', timestamp: $now.toISO() } }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "get-signals",
+      "name": "Get Active Signals",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [450, 300],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "n8n-webhook-auth",
+          "name": "n8n Webhook Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "signals-exist",
+              "leftValue": "={{ $json.overview.totalSignals }}",
+              "rightValue": "0",
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ]
+        }
+      },
+      "id": "check-signals",
+      "name": "Active Signals Exist?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "language": "js",
+        "jsCode": "// Extract active signals from overview\nconst overview = $json.overview;\nconst activeSignals = overview.topSymbols || [];\n\n// Prepare for price updates (future enhancement)\n// For now, we'll monitor signal age and performance\nconst signalStatus = activeSignals.map(signal => {\n  const age = Date.now() - new Date(signal.created_at).getTime();\n  const ageHours = Math.floor(age / (1000 * 60 * 60));\n  const ageDays = Math.floor(ageHours / 24);\n  \n  return {\n    symbol: signal.symbol,\n    score: signal.convergence_score,\n    strength: signal.signal_strength,\n    entryPrice: signal.entry_price,\n    stopLoss: signal.stop_loss,\n    takeProfit: signal.take_profit,\n    age: {\n      hours: ageHours,\n      days: ageDays,\n      isStale: ageDays > 3\n    },\n    status: 'active' // Will be updated with real-time prices\n  };\n});\n\n// Identify signals needing attention\nconst attentionNeeded = signalStatus.filter(signal => \n  signal.age.isStale || \n  signal.score >= 80 // High-value signals\n);\n\nconsole.log(`Monitoring ${signalStatus.length} active signals, ${attentionNeeded.length} need attention`);\n\nreturn {\n  activeSignals: signalStatus,\n  attentionNeeded: attentionNeeded,\n  summary: {\n    total: overview.totalSignals,\n    strong: overview.strongSignals,\n    averageScore: overview.averageScore,\n    staleCount: signalStatus.filter(s => s.age.isStale).length\n  }\n};"
+      },
+      "id": "process-signals",
+      "name": "Process Signal Status",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [850, 200]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "attention-check",
+              "leftValue": "={{ $json.attentionNeeded.length }}",
+              "rightValue": "0",
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ]
+        }
+      },
+      "id": "need-attention",
+      "name": "Signals Need Attention?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1050, 200]
+    },
+    {
+      "parameters": {
+        "language": "js",
+        "jsCode": "// Format attention alerts\nconst attentionSignals = $json.attentionNeeded;\nconst summary = $json.summary;\n\n// Create alert messages for different conditions\nconst alerts = [];\n\n// Stale signal alerts\nconst staleSignals = attentionSignals.filter(s => s.age.isStale);\nif (staleSignals.length > 0) {\n  alerts.push({\n    type: 'stale',\n    severity: 'warning',\n    message: `${staleSignals.length} signals are over 3 days old`,\n    symbols: staleSignals.map(s => s.symbol).join(', ')\n  });\n}\n\n// High-value signal monitoring\nconst highValueSignals = attentionSignals.filter(s => s.score >= 80);\nif (highValueSignals.length > 0) {\n  alerts.push({\n    type: 'high-value',\n    severity: 'info',\n    message: `Monitoring ${highValueSignals.length} high-value signals`,\n    symbols: highValueSignals.map(s => `${s.symbol} (${s.score})`).join(', ')\n  });\n}\n\nreturn {\n  alerts: alerts,\n  hasUrgent: alerts.some(a => a.severity === 'urgent'),\n  summaryText: `Active: ${summary.total} | Strong: ${summary.strong} | Avg Score: ${summary.averageScore.toFixed(1)}`\n};"
+      },
+      "id": "format-alerts",
+      "name": "Format Attention Alerts",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1250, 100]
+    },
+    {
+      "parameters": {
+        "channel": "#signal-monitoring",
+        "text": "=📊 *Signal Monitor Update*",
+        "attachments": [
+          {
+            "color": "={{ $json.hasUrgent ? '#ff0000' : '#0099ff' }}",
+            "title": "Signal Status",
+            "text": "={{ $json.summaryText }}",
+            "fields": {
+              "values": "={{ $json.alerts.map(a => ({ title: a.type.toUpperCase(), value: a.message, short: false })) }}"
+            },
+            "footer": "THub V2 Signal Monitor",
+            "ts": "={{ Math.floor($now.toSeconds()) }}"
+          }
+        ],
+        "otherOptions": {}
+      },
+      "id": "notify-status",
+      "name": "Notify Status",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.1,
+      "position": [1450, 100]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $env.PERFORMANCE_SHEET_ID }}",
+          "mode": "id"
+        },
+        "sheetName": "Signal Monitoring",
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "timestamp": "={{ $now.toISO() }}",
+            "totalSignals": "={{ $json.summary.total }}",
+            "strongSignals": "={{ $json.summary.strong }}",
+            "averageScore": "={{ $json.summary.averageScore }}",
+            "staleCount": "={{ $json.summary.staleCount }}",
+            "alertsGenerated": "={{ $node['Format Attention Alerts'].json.alerts.length }}"
+          }
+        }
+      },
+      "id": "log-monitoring",
+      "name": "Log Monitoring",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [1050, 400]
+    }
+  ],
+  "connections": {
+    "Monitor Schedule": {
+      "main": [
+        [
+          {
+            "node": "Get Active Signals",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Active Signals": {
+      "main": [
+        [
+          {
+            "node": "Active Signals Exist?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Active Signals Exist?": {
+      "main": [
+        [
+          {
+            "node": "Process Signal Status",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Process Signal Status": {
+      "main": [
+        [
+          {
+            "node": "Signals Need Attention?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Signals Need Attention?": {
+      "main": [
+        [
+          {
+            "node": "Format Attention Alerts",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log Monitoring",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Attention Alerts": {
+      "main": [
+        [
+          {
+            "node": "Notify Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Signal Status": {
+      "main": [
+        [
+          {
+            "node": "Log Monitoring",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner"
+  }
+}

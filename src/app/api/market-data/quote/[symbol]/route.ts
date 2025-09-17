@@ -4,10 +4,10 @@ import { logger } from '@/lib/logger'
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ symbol: string }> }
+  { params }: any
 ) {
   try {
-    const { symbol } = await params
+    const { symbol } = params
     
     if (!symbol) {
       return NextResponse.json(
