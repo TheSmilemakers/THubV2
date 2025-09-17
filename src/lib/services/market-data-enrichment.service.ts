@@ -1,6 +1,7 @@
 import { EODHDService, RealTimeQuote } from './eodhd.service';
 import { EODHDWebSocketService, WSMessage, WSTradeData } from './eodhd-websocket.service';
-import { getCacheService } from './cache.service';
+import { CacheService } from './cache.service';
+import { CacheFactory } from './cache-factory';
 import { getRateLimiter } from './rate-limiter.service';
 import { logger } from '@/lib/logger';
 import { ExternalAPIError } from '@/lib/errors';
@@ -34,7 +35,7 @@ export interface MarketDataSubscription {
 export class MarketDataEnrichmentService {
   private eodhd: EODHDService;
   private websocket: EODHDWebSocketService;
-  private cache = getCacheService();
+  private cache: CacheService | null = null;
   private rateLimiter = getRateLimiter();
   private logger = logger.createChild('MarketDataEnrichment');
   
@@ -47,6 +48,16 @@ export class MarketDataEnrichmentService {
     this.websocket = new EODHDWebSocketService();
     
     this.setupWebSocketHandlers();
+  }
+
+  /**
+   * Get cache service instance (lazy initialization)
+   */
+  private async getCache(): Promise<CacheService> {
+    if (!this.cache) {
+      this.cache = await CacheFactory.getInstance();
+    }
+    return this.cache;
   }
 
   /**
@@ -149,7 +160,8 @@ export class MarketDataEnrichmentService {
       const canProceed = await this.rateLimiter.checkLimit(1);
       if (!canProceed) {
         // Fall back to cache even if stale
-        const staleData = await this.cache.get(`market_data:${symbol}`);
+        const cache = await this.getCache();
+        const staleData = await cache.get(`market_data:${symbol}`);
         if (staleData) {
           this.logger.debug(`Using stale cache for ${symbol} due to rate limits`);
           return {
@@ -165,7 +177,7 @@ export class MarketDataEnrichmentService {
       const enrichedData = this.convertToEnrichedData(quote, 'rest-api');
       
       // Cache the data
-      await this.cache.set(`market_data:${symbol}`, enrichedData, 300); // 5 minutes
+      await cache.set(`market_data:${symbol}`, enrichedData, 300); // 5 minutes
       this.realtimeData.set(symbol, enrichedData);
       
       return enrichedData;
@@ -174,7 +186,8 @@ export class MarketDataEnrichmentService {
       this.logger.error(`Failed to fetch enriched data for ${symbol}`, error);
       
       // Last resort: try cache
-      const cachedData = await this.cache.get(`market_data:${symbol}`);
+      const cache = await this.getCache();
+      const cachedData = await cache.get(`market_data:${symbol}`);
       if (cachedData) {
         return {
           ...cachedData,

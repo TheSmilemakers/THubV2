@@ -1,5 +1,6 @@
 import { EODHDService, RealTimeQuote, EODData, TechnicalIndicator } from './eodhd.service';
-import { getCacheService } from './cache.service';
+import { CacheService } from './cache.service';
+import { CacheFactory } from './cache-factory';
 import { getRateLimiter } from './rate-limiter.service';
 import { logger } from '@/lib/logger';
 import { ValidationError } from '@/lib/errors';
@@ -26,12 +27,22 @@ export interface TechnicalAnalysisResult {
  */
 export class TechnicalAnalysisService {
   private eodhd: EODHDService;
-  private cache = getCacheService();
+  private cache: CacheService | null = null;
   private rateLimiter = getRateLimiter();
   private logger = logger.createChild('TechnicalAnalysis');
 
   constructor(eodhd?: EODHDService) {
     this.eodhd = eodhd || new EODHDService();
+  }
+
+  /**
+   * Get cache service instance (lazy initialization)
+   */
+  private async getCache(): Promise<CacheService> {
+    if (!this.cache) {
+      this.cache = await CacheFactory.getInstance();
+    }
+    return this.cache;
   }
 
   /**
@@ -109,10 +120,11 @@ export class TechnicalAnalysisService {
     sma50: TechnicalIndicator[];
   }> {
     // Check cache first for all indicators
+    const cache = await this.getCache();
     const [cachedRSI, cachedSMA20, cachedSMA50] = await Promise.all([
-      this.cache.getCachedIndicator(symbol, 'rsi', 14),
-      this.cache.getCachedIndicator(symbol, 'sma', 20),
-      this.cache.getCachedIndicator(symbol, 'sma', 50)
+      cache.getCachedIndicator(symbol, 'rsi', 14),
+      cache.getCachedIndicator(symbol, 'sma', 20),
+      cache.getCachedIndicator(symbol, 'sma', 50)
     ]);
     
     const indicators: any = {};
@@ -127,7 +139,7 @@ export class TechnicalAnalysisService {
         (async () => {
           await this.rateLimiter.consume(5); // RSI costs 5 API calls
           indicators.rsi = await this.eodhd.getRSI(symbol, 14);
-          await this.cache.setCachedIndicator(symbol, 'rsi', indicators.rsi, {
+          await cache.setCachedIndicator(symbol, 'rsi', indicators.rsi, {
             period: 14,
             apiCallsUsed: 5
           });
@@ -144,7 +156,7 @@ export class TechnicalAnalysisService {
         (async () => {
           await this.rateLimiter.consume(5); // SMA costs 5 API calls
           indicators.sma20 = await this.eodhd.getSMA(symbol, 20);
-          await this.cache.setCachedIndicator(symbol, 'sma', indicators.sma20, {
+          await cache.setCachedIndicator(symbol, 'sma', indicators.sma20, {
             period: 20,
             apiCallsUsed: 5
           });
@@ -161,7 +173,7 @@ export class TechnicalAnalysisService {
         (async () => {
           await this.rateLimiter.consume(5); // SMA costs 5 API calls
           indicators.sma50 = await this.eodhd.getSMA(symbol, 50);
-          await this.cache.setCachedIndicator(symbol, 'sma', indicators.sma50, {
+          await cache.setCachedIndicator(symbol, 'sma', indicators.sma50, {
             period: 50,
             apiCallsUsed: 5
           });

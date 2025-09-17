@@ -1,0 +1,170 @@
+{
+  "name": "THub V2 - Batch Analysis (PRODUCTION)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "batch-analysis-trigger",
+        "responseMode": "onReceived",
+        "responseData": "firstEntryJson",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Batch Analysis Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [250, 300],
+      "webhookId": "batch-analysis-trigger"
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "// Validate and prepare batch data\nconst input = $input.first();\nconst data = input ? input.json : {};\n\n// Extract symbols and metadata\nconst symbols = data.symbols || [];\nconst priority = data.priority || 'normal';\nconst metadata = data.metadata || {};\n\nif (!symbols || symbols.length === 0) {\n  throw new Error('No symbols provided for analysis');\n}\n\nif (symbols.length > 50) {\n  throw new Error('Too many symbols. Maximum 50 allowed per batch');\n}\n\n// Split into priority groups\nconst highPrioritySymbols = [];\nconst normalPrioritySymbols = [];\n\n// If metadata contains opportunity scores, use them for prioritization\nif (metadata.opportunityScores) {\n  const scores = metadata.opportunityScores;\n  \n  symbols.forEach(symbol => {\n    const scoreData = scores.find(s => s.symbol === symbol);\n    const score = scoreData ? scoreData.score : 50;\n    \n    if (score >= 70 || priority === 'high') {\n      highPrioritySymbols.push(symbol);\n    } else {\n      normalPrioritySymbols.push(symbol);\n    }\n  });\n} else {\n  // No scores provided, use priority flag\n  if (priority === 'high') {\n    highPrioritySymbols.push(...symbols);\n  } else {\n    normalPrioritySymbols.push(...symbols);\n  }\n}\n\nconsole.log(`Batch analysis request: ${symbols.length} symbols`);\nconsole.log(`High priority: ${highPrioritySymbols.length}, Normal: ${normalPrioritySymbols.length}`);\n\nreturn [{\n  json: {\n    totalSymbols: symbols.length,\n    highPrioritySymbols,\n    normalPrioritySymbols,\n    metadata,\n    requestId: data.requestId || Math.random().toString(36).substr(2, 9),\n    timestamp: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "prepare-batch",
+      "name": "Prepare Batch",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "batchSize": 5,
+        "options": {}
+      },
+      "id": "split-batch",
+      "name": "Split into Batches",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.APP_URL }}/api/webhooks/n8n",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  action: 'batch_analyze',\n  symbols: $json.symbols,\n  priority: $json.priority || 'normal',\n  metadata: {\n    batchId: $json.requestId,\n    batchIndex: $itemIndex,\n    totalBatches: Math.ceil($json.totalSymbols / 5),\n    source: $json.metadata.source || 'batch_analysis'\n  }\n}) }}",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "id": "process-batch",
+      "name": "Process Symbol Batch",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [850, 300],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "{{ credentialId }}",
+          "name": "THub V2 Webhook Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "value": 2,
+        "unit": "seconds"
+      },
+      "id": "rate-limit",
+      "name": "Rate Limit",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [1050, 300],
+      "webhookId": "batch-analysis-trigger"
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "// Aggregate results\nconst items = $input.all();\nconst results = items.map(item => item.json);\n\n// Calculate summary statistics\nlet totalProcessed = 0;\nlet totalSignals = 0;\nlet totalErrors = 0;\nlet allResults = [];\n\nresults.forEach(result => {\n  if (result.summary) {\n    totalProcessed += result.summary.totalSymbols || 0;\n    totalSignals += result.summary.signalsCreated || 0;\n  }\n  \n  if (result.results) {\n    allResults.push(...result.results);\n  }\n  \n  if (result.error) {\n    totalErrors++;\n  }\n});\n\nconst summary = {\n  totalRequested: $node['Prepare Batch'].json.totalSymbols,\n  totalProcessed,\n  totalSignals,\n  totalErrors,\n  successRate: totalProcessed > 0 ? ((totalProcessed - totalErrors) / totalProcessed * 100).toFixed(1) + '%' : '0%',\n  signalRate: totalProcessed > 0 ? (totalSignals / totalProcessed * 100).toFixed(1) + '%' : '0%',\n  processingTime: new Date().getTime() - new Date($node['Prepare Batch'].json.timestamp).getTime()\n};\n\nconsole.log('Batch analysis complete:', JSON.stringify(summary, null, 2));\n\nreturn [{\n  json: {\n    success: true,\n    requestId: $node['Prepare Batch'].json.requestId,\n    summary,\n    results: allResults,\n    timestamp: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "aggregate-results",
+      "name": "Aggregate Results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1250, 300]
+    }
+  ],
+  "connections": {
+    "Batch Analysis Webhook": {
+      "main": [
+        [
+          {
+            "node": "Prepare Batch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Batch": {
+      "main": [
+        [
+          {
+            "node": "Split into Batches",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split into Batches": {
+      "main": [
+        [
+          {
+            "node": "Process Symbol Batch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Symbol Batch": {
+      "main": [
+        [
+          {
+            "node": "Rate Limit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Rate Limit": {
+      "main": [
+        [
+          {
+            "node": "Split into Batches",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split into Batches": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Aggregate Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": ""
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 1,
+  "updatedAt": "2025-09-17T17:00:00.000Z",
+  "versionId": "production-v1"
+}
