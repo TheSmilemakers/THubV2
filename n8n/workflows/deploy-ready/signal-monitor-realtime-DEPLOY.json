@@ -22,7 +22,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ $env.APP_URL }}/api/webhooks/n8n",
+        "url": "https://www.thub.rajanmaher.com/api/webhooks/n8n",
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "httpHeaderAuth",
         "sendBody": true,
@@ -112,7 +112,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ $env.APP_URL }}/api/webhooks/n8n",
+        "url": "https://www.thub.rajanmaher.com/api/webhooks/n8n",
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "httpHeaderAuth",
         "sendBody": true,
