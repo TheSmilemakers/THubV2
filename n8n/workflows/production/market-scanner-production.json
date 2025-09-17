@@ -1,0 +1,254 @@
+{
+  "name": "THub V2 - Market Scanner (PRODUCTION)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 30
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Market Hours Schedule",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [250, 300],
+      "notes": "Runs every 30 minutes during market hours (9:30 AM - 4:00 PM EST)"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "market-hours-check",
+              "leftValue": "={{ $now.toFormat('HH:mm') }}",
+              "rightValue": "09:30",
+              "operator": {
+                "type": "string",
+                "operation": "larger"
+              }
+            },
+            {
+              "id": "market-close-check",
+              "leftValue": "={{ $now.toFormat('HH:mm') }}",
+              "rightValue": "16:00",
+              "operator": {
+                "type": "string",
+                "operation": "smaller"
+              }
+            },
+            {
+              "id": "weekday-check",
+              "leftValue": "={{ $now.weekday }}",
+              "rightValue": 6,
+              "operator": {
+                "type": "number",
+                "operation": "smaller"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "market-status",
+      "name": "Is Market Open?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://eodhistoricaldata.com/api/real-time/VIX.INDX?api_token=685096b3938f02.53634731&fmt=json",
+        "options": {
+          "timeout": 10000,
+          "retry": {
+            "maxTries": 3,
+            "waitBetweenTries": 1000
+          }
+        }
+      },
+      "id": "market-conditions",
+      "name": "Get VIX Market Conditions",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [650, 300],
+      "notes": "Fetch VIX for market volatility assessment"
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "try {\n  // Get VIX data from previous node\n  const input = $input.first();\n  const vixData = input ? input.json : {};\n  \n  // Extract VIX value\n  const vix = vixData.close || vixData.previousClose || 20;\n  \n  const marketConditions = {\n    vix: vix,\n    trend: vix > 25 ? 'risk-off' : vix > 20 ? 'neutral' : 'risk-on'\n  };\n\n  // Determine adaptive filters based on market conditions\n  const adaptiveFilters = {\n    exchange: 'US',\n    minVolume: marketConditions.vix > 25 ? 2000000 : 1000000,\n    minPrice: 5,\n    maxPrice: 500,\n    minDailyChange: marketConditions.vix > 30 ? 3 : 2,\n    excludeSectors: [],\n    limit: marketConditions.vix > 25 ? 20 : 30\n  };\n\n  // Time-based adjustments\n  const hour = new Date().getHours();\n  let timeOfDay = 'midday';\n  \n  if (hour < 10) timeOfDay = 'openingHour';\n  else if (hour >= 15) timeOfDay = 'powerHour';\n  \n  if (timeOfDay === 'powerHour') {\n    adaptiveFilters.minDailyChange = 2.5;\n    adaptiveFilters.limit = 25;\n  }\n\n  console.log(`Market conditions: VIX=${marketConditions.vix.toFixed(1)}, Trend=${marketConditions.trend}`);\n  console.log(`Adaptive filters:`, JSON.stringify(adaptiveFilters, null, 2));\n\n  return [{\n    json: {\n      filters: adaptiveFilters,\n      marketConditions: marketConditions,\n      timeOfDay: timeOfDay,\n      timestamp: new Date().toISOString()\n    }\n  }];\n  \n} catch (error) {\n  console.error('Error in adaptive filters:', error.message);\n  \n  // Return default filters on error\n  return [{\n    json: {\n      filters: {\n        exchange: 'US',\n        minVolume: 1000000,\n        minPrice: 5,\n        maxPrice: 500,\n        minDailyChange: 2,\n        excludeSectors: [],\n        limit: 20\n      },\n      marketConditions: { vix: 20, trend: 'neutral' },\n      timeOfDay: 'midday',\n      timestamp: new Date().toISOString(),\n      error: error.message\n    }\n  }];\n}"
+      },
+      "id": "adaptive-filters",
+      "name": "Apply Adaptive Filters",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://www.thub.rajanmaher.com/api/webhooks/n8n",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  action: 'market_scan',\n  filters: $json.filters,\n  priority: 'high',\n  metadata: {\n    workflow: 'adaptive_market_scanner',\n    timestamp: $json.timestamp,\n    marketConditions: $json.marketConditions,\n    timeOfDay: $json.timeOfDay\n  }\n}) }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "market-scan",
+      "name": "Execute Market Scan",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1050, 300],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "NhunubX0SoPRJUtu",
+          "name": "THub V2 Webhook Auth"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "success-check",
+              "leftValue": "={{ $json.success }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ]
+        }
+      },
+      "id": "scan-success",
+      "name": "Scan Successful?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1250, 300]
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "// Log success\nconst input = $input.first();\nconst result = input ? input.json : {};\n\nconsole.log('Market scan completed successfully');\nconsole.log(`Summary:`, JSON.stringify(result.summary || {}, null, 2));\n\nreturn [{\n  json: {\n    success: true,\n    message: 'Market scan completed',\n    summary: result.summary || {},\n    timestamp: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "log-success",
+      "name": "Log Success",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1450, 200]
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "// Log error\nconst input = $input.first();\nconst error = input ? input.json : {};\n\nconsole.error('Market scan failed');\nconsole.error('Error:', error.error || error.message || 'Unknown error');\n\nreturn [{\n  json: {\n    success: false,\n    message: 'Market scan failed',\n    error: error.error || error.message || 'Unknown error',\n    timestamp: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "log-error",
+      "name": "Log Error",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1450, 400]
+    }
+  ],
+  "connections": {
+    "Market Hours Schedule": {
+      "main": [[
+        {
+          "node": "Is Market Open?",
+          "type": "main",
+          "index": 0
+        }
+      ]]
+    },
+    "Is Market Open?": {
+      "main": [
+        [
+          {
+            "node": "Get VIX Market Conditions",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Get VIX Market Conditions": {
+      "main": [[
+        {
+          "node": "Apply Adaptive Filters",
+          "type": "main",
+          "index": 0
+        }
+      ]]
+    },
+    "Apply Adaptive Filters": {
+      "main": [[
+        {
+          "node": "Execute Market Scan",
+          "type": "main",
+          "index": 0
+        }
+      ]]
+    },
+    "Execute Market Scan": {
+      "main": [[
+        {
+          "node": "Scan Successful?",
+          "type": "main",
+          "index": 0
+        }
+      ]]
+    },
+    "Scan Successful?": {
+      "main": [
+        [
+          {
+            "node": "Log Success",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true
+  },
+  "versionId": "550be768-0fcf-4fe2-a37e-b399c755ba23",
+  "id": "fPC0yQPZZGK0nDyc",
+  "meta": {
+    "templateId": "market-scanner-production",
+    "lastUpdated": "2025-09-17T18:04:46.567Z"
+  },
+  "tags": []
+}

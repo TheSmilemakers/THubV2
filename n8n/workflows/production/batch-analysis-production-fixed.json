@@ -1,0 +1,112 @@
+{
+  "name": "THub V2 - Batch Analysis (PRODUCTION)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "batch-analysis-trigger",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Batch Analysis Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [250, 300],
+      "webhookId": "batch-analysis-trigger"
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "// Validate and prepare batch data\nconst input = $input.first();\nconst webhookData = input ? input.json : {};\n\n// Extract data from webhook body\nconst data = webhookData.body || webhookData;\n\n// Extract symbols and metadata\nconst symbols = data.symbols || [];\nconst priority = data.priority || 'normal';\nconst metadata = data.metadata || {};\n\nif (!symbols || symbols.length === 0) {\n  throw new Error('No symbols provided for analysis');\n}\n\nif (symbols.length > 50) {\n  throw new Error('Too many symbols. Maximum 50 allowed per batch');\n}\n\nconsole.log(`Batch analysis request: ${symbols.length} symbols`);\n\nreturn [{\n  json: {\n    symbols: symbols,\n    totalSymbols: symbols.length,\n    priority: priority,\n    metadata,\n    requestId: data.requestId || Math.random().toString(36).substr(2, 9),\n    timestamp: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "prepare-batch",
+      "name": "Prepare Batch",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://www.thub.rajanmaher.com/api/webhooks/n8n",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  action: 'batch_analyze',\n  symbols: $json.symbols,\n  priority: $json.priority || 'normal',\n  metadata: {\n    batchId: $json.requestId,\n    source: $json.metadata.source || 'batch_analysis'\n  }\n}) }}",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "id": "process-batch",
+      "name": "Process Symbol Batch",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [650, 300],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "NhunubX0SoPRJUtu",
+          "name": "THub V2 Webhook Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ {\n  success: true,\n  requestId: $node['Prepare Batch'].json.requestId,\n  message: 'Batch analysis initiated',\n  totalSymbols: $node['Prepare Batch'].json.totalSymbols,\n  response: $json,\n  timestamp: new Date().toISOString()\n} }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "respond-success",
+      "name": "Success Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [850, 300]
+    }
+  ],
+  "connections": {
+    "Batch Analysis Webhook": {
+      "main": [[
+        {
+          "node": "Prepare Batch",
+          "type": "main",
+          "index": 0
+        }
+      ]]
+    },
+    "Prepare Batch": {
+      "main": [[
+        {
+          "node": "Process Symbol Batch",
+          "type": "main",
+          "index": 0
+        }
+      ]]
+    },
+    "Process Symbol Batch": {
+      "main": [[
+        {
+          "node": "Success Response",
+          "type": "main",
+          "index": 0
+        }
+      ]]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/New_York",
+    "saveManualExecutions": true
+  },
+  "versionId": "2ab9c7a2-bcde-4027-bb08-5515600941a0",
+  "id": "eEX7Vp4D8B2BYUwO",
+  "meta": {
+    "templateId": "batch-analysis-production",
+    "lastUpdated": "2025-09-17T22:28:00.969Z",
+    "note": "FIXED: Changed responseMode to 'responseNode' and updated code to handle webhook body structure correctly"
+  },
+  "tags": []
+}

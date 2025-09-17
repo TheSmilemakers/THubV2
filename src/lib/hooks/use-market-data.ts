@@ -150,7 +150,7 @@ export function useMarketIndices(): UseQueryResult<MarketIndex[], Error> {
 }
 
 /**
- * Hook to fetch dashboard statistics (placeholder - connects to real analytics later)
+ * Hook to fetch dashboard statistics from real analytics endpoint
  * 
  * @example
  * const { data: stats, isLoading } = useDashboardStats()
@@ -159,31 +159,38 @@ export function useDashboardStats(): UseQueryResult<DashboardStats, Error> {
   return useQuery<DashboardStats, Error>({
     queryKey: ['dashboard', 'stats'],
     queryFn: async () => {
-      // TODO: Connect to real analytics service
-      // For now, return computed stats based on recent signals
       try {
-        // This would call signalsService.getAnalytics() in real implementation
-        const stats: DashboardStats = {
-          active_signals: 24,
-          success_rate: 87,
-          total_profit: 12450,
-          avg_return: 15.3,
-          change_active_signals: '+12%',
-          change_success_rate: '+5%',
-          change_total_profit: '+23%',
-          change_avg_return: '+2.1%',
+        const response = await fetch('/api/signals/analytics');
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch dashboard stats');
         }
-
+        
+        const analytics = await response.json();
+        
+        // Transform analytics response to DashboardStats format
+        const stats: DashboardStats = {
+          active_signals: analytics.active_signals || 0,
+          success_rate: analytics.success_rate || 0,
+          total_profit: analytics.total_return || 0,
+          avg_return: analytics.average_return || 0,
+          // Calculate week-over-week changes (would need historical data)
+          // For now, return static placeholders until we implement historical tracking
+          change_active_signals: '+0%',
+          change_success_rate: '+0%', 
+          change_total_profit: '+0%',
+          change_avg_return: '+0%',
+        };
+        
         logger.info('Fetched dashboard stats', stats)
-        return stats
+        return stats;
       } catch (error) {
         logger.error('Failed to fetch dashboard stats', error)
         throw new Error('Unable to load dashboard statistics')
       }
     },
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    gcTime: 15 * 60 * 1000, // 15 minutes
-    refetchInterval: 10 * 60 * 1000, // Refetch every 10 minutes
+    staleTime: 60 * 1000, // 1 minute
+    gcTime: 5 * 60 * 1000, // 5 minutes
     retry: 2,
   })
 }

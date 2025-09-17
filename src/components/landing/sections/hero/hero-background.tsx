@@ -4,6 +4,50 @@ import { useTheme, type Theme } from '@/lib/themes/use-theme';
 import { cn } from '@/lib/utils';
 import { useEffect, useRef, useState } from 'react';
 
+// Singleton WebGL context manager to prevent context overflow
+class WebGLContextManager {
+  private static instance: WebGLContextManager;
+  private activeContexts: Map<string, CanvasRenderingContext2D> = new Map();
+  private readonly maxContexts = 8; // Browser limit is typically 16, we'll use half
+
+  static getInstance(): WebGLContextManager {
+    if (!WebGLContextManager.instance) {
+      WebGLContextManager.instance = new WebGLContextManager();
+    }
+    return WebGLContextManager.instance;
+  }
+
+  getContext(canvas: HTMLCanvasElement, id: string): CanvasRenderingContext2D | null {
+    // Clean up excess contexts if we're at the limit
+    if (this.activeContexts.size >= this.maxContexts) {
+      const oldestKey = this.activeContexts.keys().next().value;
+      if (oldestKey !== undefined) {
+        this.activeContexts.delete(oldestKey);
+      }
+    }
+
+    try {
+      const ctx = canvas.getContext('2d', {
+        alpha: true,
+        desynchronized: true, // Performance optimization
+      });
+      
+      if (ctx) {
+        this.activeContexts.set(id, ctx);
+      }
+      
+      return ctx;
+    } catch (error) {
+      console.warn('Failed to create canvas context:', error);
+      return null;
+    }
+  }
+
+  releaseContext(id: string): void {
+    this.activeContexts.delete(id);
+  }
+}
+
 interface HeroBackgroundProps {
   theme?: Theme;
   className?: string;
@@ -13,6 +57,9 @@ export function HeroBackground({ className }: HeroBackgroundProps) {
   const { theme } = useTheme();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [mounted, setMounted] = useState(false);
+  const contextIdRef = useRef(`hero-bg-${Date.now()}`);
+  const animationIdRef = useRef<number>(0);
+  const contextManager = WebGLContextManager.getInstance();
 
   // Handle hydration
   useEffect(() => {
@@ -23,7 +70,13 @@ export function HeroBackground({ className }: HeroBackgroundProps) {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const ctx = canvas.getContext('2d');
+    // Check for reduced motion preference
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (prefersReducedMotion) {
+      return;
+    }
+
+    const ctx = contextManager.getContext(canvas, contextIdRef.current);
     if (!ctx) return;
 
     // Set canvas size
@@ -34,8 +87,6 @@ export function HeroBackground({ className }: HeroBackgroundProps) {
 
     resizeCanvas();
     window.addEventListener('resize', resizeCanvas);
-
-    let animationId: number;
 
     if (theme === 'synthwave') {
       // Synthwave: Animated grid with perspective and neon effects
@@ -133,7 +184,7 @@ export function HeroBackground({ className }: HeroBackgroundProps) {
           ctx.fill();
         }
 
-        animationId = requestAnimationFrame(animateSynthwave);
+        animationIdRef.current = requestAnimationFrame(animateSynthwave);
       };
 
       animateSynthwave();
@@ -221,7 +272,7 @@ export function HeroBackground({ className }: HeroBackgroundProps) {
           });
         });
 
-        animationId = requestAnimationFrame(animateProfessional);
+        animationIdRef.current = requestAnimationFrame(animateProfessional);
       };
 
       animateProfessional();
@@ -229,19 +280,38 @@ export function HeroBackground({ className }: HeroBackgroundProps) {
 
     return () => {
       window.removeEventListener('resize', resizeCanvas);
-      cancelAnimationFrame(animationId);
+      if (animationIdRef.current) {
+        cancelAnimationFrame(animationIdRef.current);
+      }
+      // Release the context when component unmounts
+      contextManager.releaseContext(contextIdRef.current);
     };
-  }, [theme]);
+  }, [theme, contextManager]);
+
+  // Check if we should render the canvas based on viewport and device capabilities
+  const shouldRenderCanvas = () => {
+    if (typeof window === 'undefined') return false;
+    
+    // Disable on mobile devices with limited resources
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    const hasLowMemory = 'deviceMemory' in navigator && (navigator as any).deviceMemory < 4;
+    
+    return !isMobile || !hasLowMemory;
+  };
 
   return (
     <div className={cn("absolute inset-0 overflow-hidden", className)}>
-      <canvas
-        ref={canvasRef}
-        className="absolute inset-0 w-full h-full"
-        style={{
-          mixBlendMode: mounted ? (theme === 'synthwave' ? 'normal' : 'soft-light') : 'normal'
-        }}
-      />
+      {mounted && shouldRenderCanvas() && (
+        <canvas
+          ref={canvasRef}
+          className="absolute inset-0 w-full h-full"
+          style={{
+            mixBlendMode: theme === 'synthwave' ? 'normal' : 'soft-light',
+            willChange: 'transform',
+            transform: 'translateZ(0)' // Force GPU acceleration
+          }}
+        />
+      )}
       
       {/* Additional static overlays - only render after mount to avoid hydration mismatch */}
       {mounted && theme === 'synthwave' && (

@@ -2,6 +2,20 @@
 
 A next-generation trading intelligence platform that delivers real-time market signals through advanced 3-layer convergence analysis, wrapped in a stunning glassmorphism UI optimized for mobile performance.
 
+## 🔐 MVP Access Instructions
+
+The MVP uses token-based authentication for testing. To access the platform:
+
+1. **Production URL**: https://www.thub.rajanmaher.com
+2. **Access Method**: Add `?token=<your-token>` to the URL
+3. **Test Tokens**:
+   - Rajan: `?token=9edf8e84-6266-46ee-aa77-e4e3651e3923`
+   - Jins: `?token=304c8d9a-43e5-4c81-91cb-c40eb3822de4`
+
+**Example**: https://www.thub.rajanmaher.com?token=9edf8e84-6266-46ee-aa77-e4e3651e3923
+
+⚠️ **Note**: Without a valid token, you'll see 401 authentication errors. This is expected behavior for the MVP.
+
 ## 🚀 Project Status
 
 **Current Build**: MVP v1.0 - PRODUCTION DEPLOYED! 🚀  

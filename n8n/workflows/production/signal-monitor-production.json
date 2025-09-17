@@ -1,0 +1,157 @@
+{
+  "name": "THub V2 - Signal Monitor (PRODUCTION)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 15
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Every 15 Minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [250, 300],
+      "notes": "Monitor active signals every 15 minutes"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://www.thub.rajanmaher.com/api/webhooks/n8n",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  action: 'get_active_signals',\n  filters: {\n    status: 'active',\n    minScore: 70\n  }\n}) }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "get-signals",
+      "name": "Get Active Signals",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [450, 300],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "NhunubX0SoPRJUtu",
+          "name": "THub V2 Webhook Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "signals-check",
+              "leftValue": "={{ $json.signals ? $json.signals.length : 0 }}",
+              "rightValue": "0",
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ]
+        }
+      },
+      "id": "has-signals",
+      "name": "Has Active Signals?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "// Process active signals\nconst input = $input.first();\nconst data = input ? input.json : {};\nconst signals = data.signals || [];\n\nconsole.log(`Monitoring ${signals.length} active signals`);\n\n// Group signals by status\nconst strongSignals = signals.filter(s => s.convergence_score >= 80);\nconst moderateSignals = signals.filter(s => s.convergence_score >= 70 && s.convergence_score < 80);\n\n// Check for stale signals (older than 4 hours)\nconst now = new Date();\nconst fourHoursAgo = new Date(now.getTime() - 4 * 60 * 60 * 1000);\nconst staleSignals = signals.filter(s => new Date(s.created_at) < fourHoursAgo);\n\n// Find signals needing refresh\nconst signalsNeedingRefresh = signals.filter(s => {\n  const age = (now - new Date(s.created_at)) / (1000 * 60); // age in minutes\n  return age > 60 && s.convergence_score >= 75; // Refresh high-value signals after 1 hour\n});\n\nconst summary = {\n  total: signals.length,\n  strong: strongSignals.length,\n  moderate: moderateSignals.length,\n  stale: staleSignals.length,\n  needingRefresh: signalsNeedingRefresh.length,\n  topSignals: strongSignals.slice(0, 5).map(s => ({\n    symbol: s.symbol,\n    score: s.convergence_score,\n    strength: s.signal_strength,\n    age: Math.floor((now - new Date(s.created_at)) / (1000 * 60)) + ' min'\n  }))\n};\n\nreturn [{\n  json: {\n    summary,\n    signals,\n    signalsNeedingRefresh: signalsNeedingRefresh.map(s => s.symbol),\n    timestamp: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "process-signals",
+      "name": "Process Signals",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [850, 200]
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "// Log monitoring results\nconst input = $input.first();\nconst summary = input ? (input.json.summary || {}) : {};\n\nconsole.log('Signal monitoring complete');\nconsole.log(`Active signals: ${summary.total || 0}`);\nconsole.log(`Strong signals (80+): ${summary.strong || 0}`);\n\nreturn [{\n  json: {\n    success: true,\n    message: 'Signal monitoring complete',\n    summary,\n    timestamp: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "log-results",
+      "name": "Log Results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1050, 300]
+    }
+  ],
+  "connections": {
+    "Every 15 Minutes": {
+      "main": [[
+        {
+          "node": "Get Active Signals",
+          "type": "main",
+          "index": 0
+        }
+      ]]
+    },
+    "Get Active Signals": {
+      "main": [[
+        {
+          "node": "Has Active Signals?",
+          "type": "main",
+          "index": 0
+        }
+      ]]
+    },
+    "Has Active Signals?": {
+      "main": [
+        [
+          {
+            "node": "Process Signals",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Signals": {
+      "main": [[
+        {
+          "node": "Log Results",
+          "type": "main",
+          "index": 0
+        }
+      ]]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/New_York",
+    "saveManualExecutions": true
+  },
+  "versionId": "5b39cd8d-dcbe-4374-8576-e22622c598e4",
+  "id": "Vsm1O5ROZxCTKIBh",
+  "meta": {
+    "templateId": "signal-monitor-production",
+    "lastUpdated": "2025-09-17T17:41:32.359Z"
+  },
+  "tags": []
+}

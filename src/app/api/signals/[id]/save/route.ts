@@ -41,7 +41,7 @@ export async function PUT(
       return NextResponse.json({ error: 'Failed to save signal' }, { status: 500 });
     }
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ saved: true });
   } catch (error) {
     console.error('[API] Error saving signal:', error);
     if (error instanceof ValidationError) {
@@ -78,7 +78,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'Failed to unsave signal' }, { status: 500 });
     }
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ saved: false });
   } catch (error) {
     console.error('[API] Error unsaving signal:', error);
     return NextResponse.json({ error: 'Failed to unsave signal' }, { status: 500 });

@@ -21,11 +21,17 @@ import {
 } from '@/types/signals.types'
 import { logger } from '@/lib/logger'
 import { CacheService } from './cache.service'
+import { EODHDService } from './eodhd.service'
 
 export class SignalsService {
   private supabase = createClient()
   // private cache = new CacheService() // Removed due to security concern (service role key exposure)
   private subscriptions = new Map<string, any>()
+  private eodhd: EODHDService
+
+  constructor() {
+    this.eodhd = new EODHDService()
+  }
 
   /**
    * Fetch signals with filters and pagination
@@ -169,7 +175,7 @@ export class SignalsService {
 
       if (isSaved) {
         // Remove from saved
-        const { error } = await this.supabase.rpc('array_remove', {
+        const { error } = await this.supabase.rpc('array_remove_element', {
           table_name: 'signals',
           column_name: 'saved_by',
           id: signalId,
@@ -203,7 +209,17 @@ export class SignalsService {
       
       if (error) throw error
 
-      return data as SignalAnalytics
+      // Transform the database response to match our interface
+      const result = data as any
+      return {
+        totalSignals: result.total_signals || 0,
+        successRate: result.success_rate || 0,
+        activeSignals: result.active_signals || 0,
+        averageScore: result.average_score || 0,
+        signalsByTimeframe: result.signals_by_timeframe || { '1h': 0, '4h': 0, '1d': 0 },
+        topPerformers: result.performance_data?.topPerformers || [],
+        recentActivity: result.performance_data?.recentActivity || []
+      }
     } catch (error) {
       logger.error('Error fetching signal analytics', error)
       throw error
@@ -263,20 +279,87 @@ export class SignalsService {
    * Enrich signals with additional data (company info, price data, etc.)
    */
   private async enrichSignals(signals: DbSignal[]): Promise<Signal[]> {
-    // In a real implementation, this would fetch additional data from:
-    // - Company info service
-    // - Price history service
-    // - Market data service
+    if (signals.length === 0) return [];
     
-    // For now, we'll add mock data
-    return signals.map(signal => mapDbSignalToUI(signal, {
-      company_name: this.getCompanyName(signal.symbol),
-      price_change_24h: this.generatePriceChange(),
-      price_change_percent_24h: this.generatePriceChangePercent(),
-      volume_24h: this.generateVolume(),
-      market_cap: this.generateMarketCap(),
-      price_history: this.generatePriceHistory(signal.current_price || 100)
-    }))
+    try {
+      // Fetch real market data for all signals in parallel
+      const symbols = signals.map(s => s.symbol);
+      const marketDataPromises = symbols.map(async (symbol) => {
+        try {
+          // Get real-time quote data
+          const quote = await this.eodhd.getRealTimeQuote(symbol);
+          
+          // Get intraday data for price history (last 24 hours)
+          const endDate = new Date();
+          const startDate = new Date(endDate.getTime() - 24 * 60 * 60 * 1000);
+          const intraday = await this.eodhd.getIntradayData(
+            symbol,
+            '1h',
+            startDate.toISOString().split('T')[0],
+            endDate.toISOString().split('T')[0]
+          );
+          
+          return { symbol, quote, intraday };
+        } catch (error) {
+          logger.error(`Failed to fetch market data for ${symbol}:`, error);
+          // Return null for failed fetches
+          return { symbol, quote: null, intraday: null };
+        }
+      });
+      
+      const marketDataResults = await Promise.all(marketDataPromises);
+      
+      // Create a map for quick lookup
+      const marketDataMap = new Map(
+        marketDataResults.map(result => [result.symbol, result])
+      );
+      
+      // Map signals with real data
+      return signals.map(signal => {
+        const marketData = marketDataMap.get(signal.symbol);
+        
+        if (marketData?.quote) {
+          const { quote, intraday } = marketData;
+          
+          // Calculate real price changes
+          const price_change_24h = quote.close - quote.previousClose;
+          const price_change_percent_24h = (price_change_24h / quote.previousClose) * 100;
+          
+          // Create price history from intraday data (just the values)
+          const price_history = intraday?.map(bar => bar.close) || [];
+          
+          return mapDbSignalToUI(signal, {
+            company_name: quote.code || this.getCompanyName(signal.symbol),
+            price_change_24h,
+            price_change_percent_24h,
+            volume_24h: quote.volume || 0,
+            market_cap: 0, // EODHD quote doesn't include market cap
+            price_history
+          });
+        }
+        
+        // Fallback for failed fetches - use conservative defaults
+        return mapDbSignalToUI(signal, {
+          company_name: this.getCompanyName(signal.symbol),
+          price_change_24h: 0,
+          price_change_percent_24h: 0,
+          volume_24h: 0,
+          market_cap: 0,
+          price_history: []
+        });
+      });
+    } catch (error) {
+      logger.error('Error enriching signals:', error);
+      // Return signals without enrichment on complete failure
+      return signals.map(signal => mapDbSignalToUI(signal, {
+        company_name: this.getCompanyName(signal.symbol),
+        price_change_24h: 0,
+        price_change_percent_24h: 0,
+        volume_24h: 0,
+        market_cap: 0,
+        price_history: []
+      }));
+    }
   }
 
   private mapSortColumn(sortBy: string): string {

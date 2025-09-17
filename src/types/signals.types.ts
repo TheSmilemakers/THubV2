@@ -84,12 +84,27 @@ export interface SignalResponse {
 
 // Analytics types
 export interface SignalAnalytics {
-  total_signals: number
-  active_signals: number
-  success_rate: number
-  average_return: number
-  by_strength: Record<UISignalStrength, number>
-  by_market: Record<MarketType, number>
+  totalSignals: number
+  successRate: number
+  activeSignals: number
+  averageScore: number
+  signalsByTimeframe: {
+    '1h': number
+    '4h': number
+    '1d': number
+  }
+  topPerformers: Array<{
+    symbol: string
+    performance: number
+    signals: number
+  }>
+  recentActivity: Array<{
+    id: string
+    symbol: string
+    action: 'buy' | 'sell'
+    score: number
+    timestamp: string
+  }>
 }
 
 // WebSocket event types
