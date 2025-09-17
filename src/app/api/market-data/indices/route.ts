@@ -24,10 +24,10 @@ export async function GET(request: NextRequest) {
           return {
             symbol: index.symbol,
             name: index.name,
-            price: quote.close,
-            change: quote.change,
-            changePercent: quote.change_p,
-            isUp: quote.change >= 0,
+            price: Number(quote.close) || 0,
+            change: Number(quote.change) || 0,
+            changePercent: Number(quote.change_p) || 0,
+            isUp: Number(quote.change) >= 0,
             data: intradayData.slice(-20) // Last 20 data points for sparkline
           }
         } catch (error) {

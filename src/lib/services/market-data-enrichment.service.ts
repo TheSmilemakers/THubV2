@@ -177,6 +177,7 @@ export class MarketDataEnrichmentService {
       const enrichedData = this.convertToEnrichedData(quote, 'rest-api');
       
       // Cache the data
+      const cache = await this.getCache();
       await cache.set(`market_data:${symbol}`, enrichedData, 300); // 5 minutes
       this.realtimeData.set(symbol, enrichedData);
       

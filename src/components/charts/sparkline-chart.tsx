@@ -190,7 +190,7 @@ const SparklineChart = forwardRef<HTMLDivElement, SparklineChartProps>(({
               trend === 'up' && "text-status-success",
               trend === 'down' && "text-status-error"
             )}>
-              {changePercent >= 0 ? '+' : ''}{changePercent.toFixed(1)}%
+              {changePercent >= 0 ? '+' : ''}{(Number(changePercent) || 0).toFixed(1)}%
             </span>
           )}
         </div>

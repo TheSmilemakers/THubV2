@@ -187,7 +187,7 @@ const MarketOverview = () => {
               <div className="flex items-center justify-between mb-4">
                 <span className="text-gray-400">{index.name}</span>
                 <span className={`text-sm ${index.isUp ? 'text-green-400' : 'text-red-400'}`}>
-                  {index.isUp ? '+' : ''}{index.changePercent.toFixed(2)}%
+                  {index.isUp ? '+' : ''}{(typeof index.changePercent === 'number' ? index.changePercent : Number(index.changePercent) || 0).toFixed(2)}%
                 </span>
               </div>
               <div className="h-20">

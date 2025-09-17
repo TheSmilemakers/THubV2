@@ -345,7 +345,7 @@ const ComparisonChart = forwardRef<HTMLDivElement, ComparisonChartProps>(({
                       "text-xs font-medium",
                       stats.changePercent >= 0 ? "text-status-success" : "text-status-error"
                     )}>
-                      {stats.changePercent >= 0 ? '+' : ''}{stats.changePercent.toFixed(2)}%
+                      {stats.changePercent >= 0 ? '+' : ''}{(Number(stats.changePercent) || 0).toFixed(2)}%
                     </span>
                     {stats.correlation && (
                       <span className="text-xs text-text-secondary">
