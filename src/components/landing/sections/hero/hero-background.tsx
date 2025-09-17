@@ -2,7 +2,7 @@
 
 import { useTheme, type Theme } from '@/lib/themes/use-theme';
 import { cn } from '@/lib/utils';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 interface HeroBackgroundProps {
   theme?: Theme;
@@ -12,6 +12,12 @@ interface HeroBackgroundProps {
 export function HeroBackground({ className }: HeroBackgroundProps) {
   const { theme } = useTheme();
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [mounted, setMounted] = useState(false);
+
+  // Handle hydration
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -233,16 +239,16 @@ export function HeroBackground({ className }: HeroBackgroundProps) {
         ref={canvasRef}
         className="absolute inset-0 w-full h-full"
         style={{
-          mixBlendMode: theme === 'synthwave' ? 'normal' : 'soft-light'
+          mixBlendMode: mounted ? (theme === 'synthwave' ? 'normal' : 'soft-light') : 'normal'
         }}
       />
       
-      {/* Additional static overlays */}
-      {theme === 'synthwave' && (
+      {/* Additional static overlays - only render after mount to avoid hydration mismatch */}
+      {mounted && theme === 'synthwave' && (
         <div className="absolute inset-0 bg-gradient-to-t from-bg-primary via-transparent to-bg-primary/30" />
       )}
       
-      {theme === 'professional' && (
+      {mounted && theme === 'professional' && (
         <div className="absolute inset-0 bg-gradient-to-b from-bg-primary/20 via-transparent to-bg-primary" />
       )}
     </div>

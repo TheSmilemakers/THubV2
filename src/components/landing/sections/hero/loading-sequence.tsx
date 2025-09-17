@@ -3,6 +3,40 @@
 import { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 
+const MatrixRain = () => {
+  const [matrixChars, setMatrixChars] = useState<any[]>([]);
+
+  useEffect(() => {
+    const chars = Array.from({ length: 20 }).map(() => ({
+      left: `${Math.random() * 100}%`,
+      top: `${Math.random() * 100}%`,
+      animationDelay: `${Math.random() * 2}s`,
+      animationDuration: `${2 + Math.random() * 3}s`,
+      content: Math.random() > 0.5 ? '01' : '10',
+    }));
+    setMatrixChars(chars);
+  }, []);
+
+  return (
+    <div className="absolute inset-0 pointer-events-none overflow-hidden opacity-20">
+      {matrixChars.map((char, i) => (
+        <div
+          key={i}
+          className="absolute text-xs font-mono text-terminal-green animate-pulse"
+          style={{
+            left: char.left,
+            top: char.top,
+            animationDelay: char.animationDelay,
+            animationDuration: char.animationDuration,
+          }}
+        >
+          {char.content}
+        </div>
+      ))}
+    </div>
+  );
+};
+
 export function LoadingSequence() {
   const [progress, setProgress] = useState(0);
   const [currentStep, setCurrentStep] = useState(0);
@@ -115,22 +149,7 @@ export function LoadingSequence() {
       )}
 
       {/* Matrix-style character rain effect */}
-      <div className="absolute inset-0 pointer-events-none overflow-hidden opacity-20">
-        {Array.from({ length: 20 }).map((_, i) => (
-          <div
-            key={i}
-            className="absolute text-xs font-mono text-terminal-green animate-pulse"
-            style={{
-              left: `${Math.random() * 100}%`,
-              top: `${Math.random() * 100}%`,
-              animationDelay: `${Math.random() * 2}s`,
-              animationDuration: `${2 + Math.random() * 3}s`,
-            }}
-          >
-            {Math.random() > 0.5 ? '01' : '10'}
-          </div>
-        ))}
-      </div>
+      <MatrixRain />
     </div>
   );
 }

@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { useTheme } from '@/lib/themes/use-theme';
 import { cn } from '@/lib/utils';
 
@@ -9,6 +10,17 @@ interface ThemeToggleProps {
 
 export function ThemeToggle({ className }: ThemeToggleProps) {
   const { theme, toggleTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) {
+    return (
+      <div className={cn("w-12 h-12 rounded-xl bg-glass-surface", className)} />
+    );
+  }
 
   return (
     <button

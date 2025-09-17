@@ -32,11 +32,27 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   // Initialize theme on server side to prevent flash
-  const initialTheme = 'professional'; // Default theme
+  const initialTheme = 'synthwave'; // Default theme
   
   return (
-    <html lang="en" className="dark" suppressHydrationWarning data-theme={initialTheme}>
-      <head />
+    <html lang="en" className="dark" suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                try {
+                  const stored = localStorage.getItem('thub-theme');
+                  const theme = stored === 'professional' ? 'professional' : 'synthwave';
+                  document.documentElement.setAttribute('data-theme', theme);
+                } catch (e) {
+                  document.documentElement.setAttribute('data-theme', 'synthwave');
+                }
+              })();
+            `,
+          }}
+        />
+      </head>
       <body
         className={`${inter.variable} ${jetbrainsMono.variable} ${firaCode.variable} font-sans antialiased`}
       >

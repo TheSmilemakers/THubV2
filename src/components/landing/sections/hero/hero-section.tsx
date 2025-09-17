@@ -36,15 +36,17 @@ export function HeroSection() {
         )}
       </div>
       
-      {/* Scroll indicator */}
-      <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 z-10">
-        <div className="flex flex-col items-center gap-2 opacity-70">
-          <span className="text-xs text-text-secondary">Scroll to explore</span>
-          <div className="w-5 h-8 border border-text-secondary/30 rounded-full flex justify-center">
-            <div className="w-1 h-2 bg-text-secondary/50 rounded-full mt-2 animate-bounce" />
+      {/* Scroll indicator - only show in professional theme */}
+      {theme !== 'synthwave' && (
+        <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 z-10">
+          <div className="flex flex-col items-center gap-2 opacity-70">
+            <span className="text-xs text-text-secondary">Scroll to explore</span>
+            <div className="w-5 h-8 border border-text-secondary/30 rounded-full flex justify-center">
+              <div className="w-1 h-2 bg-text-secondary/50 rounded-full mt-2 animate-bounce" />
+            </div>
           </div>
         </div>
-      </div>
+      )}
     </section>
   );
 }

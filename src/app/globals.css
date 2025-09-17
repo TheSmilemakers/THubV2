@@ -47,7 +47,7 @@
   /* Synthwave Theme */
   :root[data-theme='synthwave'] {
     /* Glass System Overrides */
-    --glass-surface: rgba(16, 0, 43, 0.85);
+    --glass-surface: rgba(16, 0, 43, 0.05);
     --glass-border: rgba(255, 0, 110, 0.3);
     
     /* Override theme colors for synthwave - RGB values */
@@ -117,7 +117,7 @@
   }
   
   .glass-hover:hover {
-    background: rgba(255, 255, 255, 0.15);
+    background: rgba(255, 255, 255, 0.08);
     transform: translateY(-2px);
     box-shadow: 0 16px 64px rgba(0, 0, 0, 0.4);
   }
@@ -148,4 +148,13 @@
 
 [data-theme="professional"] .professional-overlay {
   display: block;
+}
+
+/* Fix for professional theme glass transparency */
+[data-theme="professional"] .glass-hero,
+[data-theme="professional"] .glass-card,
+[data-theme="professional"] .glass-surface {
+  background: rgba(255, 255, 255, 0.05) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
 }

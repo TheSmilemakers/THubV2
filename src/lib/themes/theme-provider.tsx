@@ -38,7 +38,7 @@ function setStoredTheme(key: string, theme: Theme): void {
 
 export function ThemeProvider({
   children,
-  defaultTheme = 'professional',
+  defaultTheme = 'synthwave',
   storageKey = 'thub-theme'
 }: ThemeProviderProps) {
   // Initialize theme with a stable getter function
