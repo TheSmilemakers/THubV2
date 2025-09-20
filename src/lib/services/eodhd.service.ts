@@ -79,7 +79,7 @@ export class EODHDService {
   private logger = logger.createChild('EODHDService');
 
   constructor(apiKey?: string) {
-    this.apiKey = apiKey || process.env.EODHD_API_KEY || '';
+    this.apiKey = apiKey || process.env.NEXT_PUBLIC_EODHD_API_KEY || process.env.EODHD_API_KEY || '';
     
     if (!this.apiKey) {
       throw new Error('EODHD_API_KEY is not set');
