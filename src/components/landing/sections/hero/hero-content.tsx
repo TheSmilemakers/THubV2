@@ -5,7 +5,14 @@ import { cn } from '@/lib/utils';
 import { motion } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 
-export function HeroContent() {
+interface HeroContentProps {
+  onInitialize: () => void;
+  isInitializing: boolean;
+  isInitialized: boolean;
+  hasError?: boolean;
+}
+
+export function HeroContent({ onInitialize, isInitializing, isInitialized, hasError }: HeroContentProps) {
   const { theme } = useTheme();
   const router = useRouter();
 
@@ -48,7 +55,7 @@ export function HeroContent() {
           "text-5xl md:text-7xl font-bold mb-6 leading-tight",
           theme === 'synthwave'
             ? "font-mono text-terminal-green"
-            : "gradient-text"
+            : "text-3d-clean"
         )}
       >
         {theme === 'synthwave' ? (
@@ -70,7 +77,7 @@ export function HeroContent() {
           "text-xl md:text-2xl mb-8 max-w-3xl mx-auto leading-relaxed",
           theme === 'synthwave'
             ? "font-mono text-neon-cyan"
-            : "text-text-secondary"
+            : "text-3d-clean-subtitle"
         )}
       >
         {theme === 'synthwave' ? (
@@ -104,15 +111,14 @@ export function HeroContent() {
                     "bg-glass-surface border border-neon-pink text-terminal-green",
                     "font-mono tracking-wider"
                   ]
-                : [
-                    "glass-card text-text-primary",
-                    pill.color === 'primary' && "border border-primary/30",
-                    pill.color === 'secondary' && "border border-secondary/30", 
-                    pill.color === 'accent' && "border border-accent/30"
-                  ]
+                : "pill-3d-clean"
             )}
           >
-            {pill.text}
+            {theme === 'professional' ? (
+              <span>{pill.text}</span>
+            ) : (
+              pill.text
+            )}
           </div>
         ))}
       </motion.div>
@@ -124,6 +130,17 @@ export function HeroContent() {
         className="flex flex-col sm:flex-row gap-4 justify-center items-center"
       >
         <button
+          onClick={onInitialize}
+          disabled={isInitializing || isInitialized}
+          aria-label={
+            isInitializing 
+              ? "System is initializing, please wait"
+              : isInitialized
+                ? "Re-initialize the trading system"
+                : "Initialize the trading system"
+          }
+          aria-busy={isInitializing}
+          aria-pressed={isInitialized}
           className={cn(
             "px-8 py-4 rounded-xl font-semibold text-lg transition-all duration-300",
             "touch-target min-w-[200px]",
@@ -131,15 +148,22 @@ export function HeroContent() {
               ? [
                   "bg-gradient-to-r from-neon-pink to-neon-purple text-bg-primary",
                   "font-mono tracking-wide",
-                  "hover:shadow-neon transform hover:scale-105"
+                  isInitializing || isInitialized
+                    ? "opacity-60 cursor-not-allowed"
+                    : "hover:shadow-neon transform hover:scale-105"
                 ]
               : [
-                  "btn-primary",
-                  "hover:shadow-xl hover:shadow-primary/30"
+                  "btn-3d-clean",
+                  isInitializing || isInitialized && "opacity-60 cursor-not-allowed"
                 ]
           )}
         >
-          {theme === 'synthwave' ? '[INITIALIZE]' : 'Start Free Trial'}
+          {isInitializing 
+            ? (theme === 'synthwave' ? '[INITIALIZING...]' : 'Initializing...')
+            : isInitialized
+              ? (theme === 'synthwave' ? '[RE-INITIALIZE]' : 'Restart System')
+              : (theme === 'synthwave' ? '[INITIALIZE]' : 'Start Free Trial')
+          }
         </button>
 
         <button
@@ -152,35 +176,65 @@ export function HeroContent() {
                   "font-mono tracking-wide",
                   "hover:bg-neon-cyan/10 hover:shadow-lg hover:shadow-neon-cyan/30"
                 ]
-              : [
-                  "btn-glass",
-                  "hover:shadow-lg"
-                ]
+              : "btn-3d-clean-glass"
           )}
         >
-          {theme === 'synthwave' ? '[VIEW DEMO]' : 'Live Demo'}
+          {theme === 'synthwave' ? '[VIEW DEMO]' : (
+            <span>Live Demo</span>
+          )}
         </button>
 
         <button
           onClick={() => router.push('/login')}
+          disabled={!isInitialized}
+          aria-label={
+            !isInitialized
+              ? "Login button - Initialize system first to enable"
+              : "Login to your trading account"
+          }
+          aria-disabled={!isInitialized}
           className={cn(
             "px-8 py-4 rounded-xl font-semibold text-lg transition-all duration-300",
             "touch-target min-w-[200px]",
             theme === 'synthwave'
               ? [
-                  "bg-glass-surface border border-neon-pink/50 text-neon-pink",
+                  "bg-glass-surface border text-neon-pink",
                   "font-mono tracking-wide",
-                  "hover:bg-neon-pink/10 hover:border-neon-pink hover:shadow-lg hover:shadow-neon-pink/30"
+                  !isInitialized
+                    ? "border-neon-pink/20 opacity-50 cursor-not-allowed"
+                    : "border-neon-pink/50 hover:bg-neon-pink/10 hover:border-neon-pink hover:shadow-lg hover:shadow-neon-pink/30"
                 ]
               : [
-                  "btn-glass border-violet-500/30 text-violet-400",
-                  "hover:border-violet-500/50 hover:text-violet-300 hover:shadow-lg"
+                  "btn-3d-clean-glass",
+                  !isInitialized && "opacity-50 cursor-not-allowed"
                 ]
           )}
         >
-          {theme === 'synthwave' ? '[LOGIN]' : 'Login'}
+          {theme === 'synthwave' ? '[LOGIN]' : (
+            <span>Login</span>
+          )}
         </button>
       </motion.div>
+
+      {/* Error Message */}
+      {hasError && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3 }}
+          className={cn(
+            "mt-4 p-3 rounded-lg text-sm",
+            theme === 'synthwave' 
+              ? "bg-red-900/20 border border-red-500/50 text-red-400 font-mono"
+              : "bg-red-50 border border-red-200 text-red-600"
+          )}
+        >
+          {theme === 'synthwave' 
+            ? '[ERROR] INITIALIZATION TIMEOUT - PLEASE RETRY'
+            : 'Initialization timed out. Please try again.'
+          }
+        </motion.div>
+      )}
 
       {/* Social Proof */}
       <motion.div
@@ -193,45 +247,73 @@ export function HeroContent() {
             : "border-white/10 text-text-muted"
         )}
       >
-        <p className="text-sm mb-4">
+        <p className="text-sm mb-4 text-center">
           {theme === 'synthwave' ? '> TRUSTED BY TRADERS WORLDWIDE' : 'Trusted by professional traders worldwide'}
         </p>
         
-        <div className="flex justify-center items-center gap-8 text-2xl font-bold">
-          <div className={cn(
-            "flex items-center gap-2",
-            theme === 'synthwave' ? "text-terminal-green font-mono" : "gradient-text"
-          )}>
-            <span>10K+</span>
-            <span className="text-sm font-normal opacity-70">Active Users</span>
-          </div>
-          
-          <div className={cn(
-            "w-px h-8",
-            theme === 'synthwave' ? "bg-neon-pink/30" : "bg-white/20"
-          )} />
-          
-          <div className={cn(
-            "flex items-center gap-2",
-            theme === 'synthwave' ? "text-terminal-green font-mono" : "gradient-text"
-          )}>
-            <span>847</span>
-            <span className="text-sm font-normal opacity-70">Daily Signals</span>
-          </div>
-          
-          <div className={cn(
-            "w-px h-8",
-            theme === 'synthwave' ? "bg-neon-pink/30" : "bg-white/20"
-          )} />
-          
-          <div className={cn(
-            "flex items-center gap-2",
-            theme === 'synthwave' ? "text-terminal-green font-mono" : "gradient-text"
-          )}>
-            <span>95.2%</span>
-            <span className="text-sm font-normal opacity-70">Accuracy</span>
+        {/* Mobile-friendly stats with horizontal scroll */}
+        <div className="overflow-x-auto scrollbar-hide md:overflow-visible">
+          <div className="flex justify-center items-center gap-4 md:gap-8 text-lg md:text-2xl font-bold min-w-max px-4">
+            <motion.div 
+              className={cn(
+                "flex flex-col md:flex-row items-center gap-1 md:gap-2 stat-item",
+                theme === 'synthwave' ? "text-terminal-green font-mono" : "gradient-text"
+              )}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.6 }}
+            >
+              <span className="text-2xl md:text-2xl">10K+</span>
+              <span className="text-xs md:text-sm font-normal opacity-70 whitespace-nowrap">Active Users</span>
+            </motion.div>
+            
+            <div className={cn(
+              "w-px h-8 hidden md:block",
+              theme === 'synthwave' ? "bg-neon-pink/30" : "bg-white/20"
+            )} />
+            
+            <motion.div 
+              className={cn(
+                "flex flex-col md:flex-row items-center gap-1 md:gap-2 stat-item",
+                theme === 'synthwave' ? "text-terminal-green font-mono" : "gradient-text"
+              )}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.8 }}
+            >
+              <span className="text-2xl md:text-2xl">847</span>
+              <span className="text-xs md:text-sm font-normal opacity-70 whitespace-nowrap">Daily Signals</span>
+            </motion.div>
+            
+            <div className={cn(
+              "w-px h-8 hidden md:block",
+              theme === 'synthwave' ? "bg-neon-pink/30" : "bg-white/20"
+            )} />
+            
+            <motion.div 
+              className={cn(
+                "flex flex-col md:flex-row items-center gap-1 md:gap-2 stat-item",
+                theme === 'synthwave' ? "text-terminal-green font-mono" : "gradient-text"
+              )}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 1.0 }}
+            >
+              <span className="text-2xl md:text-2xl">95.2%</span>
+              <span className="text-xs md:text-sm font-normal opacity-70 whitespace-nowrap">Accuracy</span>
+            </motion.div>
           </div>
         </div>
+        
+        {/* Scroll indicator for mobile */}
+        <motion.div 
+          className="mt-4 text-center text-xs opacity-50 md:hidden"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 0.5 }}
+          transition={{ delay: 1.2 }}
+        >
+          {theme === 'synthwave' ? '< SWIPE TO SEE MORE >' : 'Swipe to see more →'}
+        </motion.div>
       </motion.div>
     </motion.div>
   );

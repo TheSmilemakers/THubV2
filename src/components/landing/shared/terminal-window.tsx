@@ -8,13 +8,15 @@ interface TerminalWindowProps {
   children: React.ReactNode;
   className?: string;
   animated?: boolean;
+  themeToggle?: React.ReactNode;
 }
 
 export function TerminalWindow({ 
   title = "TERMINAL", 
   children, 
   className,
-  animated = false 
+  animated = false,
+  themeToggle 
 }: TerminalWindowProps) {
   const [isTyping, setIsTyping] = useState(animated);
   
@@ -47,10 +49,13 @@ export function TerminalWindow({
           </div>
         </div>
         
-        {/* Connection Status */}
-        <div className="flex items-center gap-2">
-          <div className="w-2 h-2 rounded-full bg-neon-cyan animate-pulse" />
-          <span className="text-xs text-neon-cyan">CONNECTED</span>
+        {/* Connection Status with optional Theme Toggle */}
+        <div className="flex items-center gap-4">
+          {themeToggle}
+          <div className="flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full bg-neon-cyan animate-pulse" />
+            <span className="text-xs text-neon-cyan">CONNECTED</span>
+          </div>
         </div>
       </div>
 

@@ -41,48 +41,32 @@ export function ThemeProvider({
   defaultTheme = 'synthwave',
   storageKey = 'thub-theme'
 }: ThemeProviderProps) {
-  // Initialize theme with a stable getter function
-  const [theme, setTheme] = useState<Theme>(() => {
-    // Server-side: use default theme
-    if (typeof window === 'undefined') {
-      return defaultTheme;
-    }
-
-    // Client-side: check localStorage first, then DOM (set by SSR), then default
-    const storedTheme = getStoredTheme(storageKey);
-    if (storedTheme) {
-      // Apply to DOM immediately to prevent flash
-      document.documentElement.setAttribute('data-theme', storedTheme);
-      return storedTheme;
-    }
-
-    const domTheme = document.documentElement.getAttribute('data-theme');
-    if (isValidTheme(domTheme)) {
-      return domTheme;
-    }
-
-    return defaultTheme;
-  });
+  // Initialize with default theme for hydration consistency
+  const [theme, setTheme] = useState<Theme>(defaultTheme);
+  const [isHydrated, setIsHydrated] = useState(false);
 
   // Track if we've done initial sync
   const hasSynced = useRef(false);
 
-  // Sync theme on mount (only once)
+  // Sync theme on mount (only once) - AFTER hydration
   useEffect(() => {
     if (hasSynced.current) return;
     hasSynced.current = true;
 
-    // The DOM might already have the correct theme from the script
-    const currentDomTheme = document.documentElement.getAttribute('data-theme');
-    
-    // Update DOM if it doesn't match our state
-    if (currentDomTheme !== theme) {
+    // Check for stored theme preference
+    const storedTheme = getStoredTheme(storageKey);
+    if (storedTheme && storedTheme !== theme) {
+      setTheme(storedTheme);
+      document.documentElement.setAttribute('data-theme', storedTheme);
+    } else {
+      // Apply default theme to DOM
       document.documentElement.setAttribute('data-theme', theme);
+      setStoredTheme(storageKey, theme);
     }
-
-    // Ensure localStorage is in sync
-    setStoredTheme(storageKey, theme);
-  }, [theme, storageKey]);
+    
+    // Mark as hydrated
+    setIsHydrated(true);
+  }, []);
 
   // Theme toggle function with proper state updates
   const toggleTheme = useCallback(() => {
@@ -128,8 +112,15 @@ export function ThemeProvider({
     }
   }, [theme]);
 
+  // During SSR and initial hydration, always use default theme
+  // to prevent hydration mismatches
+  const contextValue = {
+    theme: typeof window === 'undefined' || !isHydrated ? defaultTheme : theme,
+    toggleTheme
+  };
+
   return (
-    <ThemeContext.Provider value={{ theme, toggleTheme }}>
+    <ThemeContext.Provider value={contextValue}>
       {children}
     </ThemeContext.Provider>
   );
