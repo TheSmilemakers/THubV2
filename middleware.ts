@@ -24,6 +24,7 @@ const PUBLIC_ROUTES = [
   '/',
   '/login',
   '/showcase',
+  '/demo',
   '/api/webhooks/n8n',
   '/api/test-analysis'
 ]

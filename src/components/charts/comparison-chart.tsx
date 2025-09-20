@@ -446,7 +446,7 @@ const ComparisonChart = forwardRef<HTMLDivElement, ComparisonChartProps>(({
         <div className="flex flex-wrap gap-2 p-4 pt-0">
           <AnimatePresence>
             {symbols.map((symbol, index) => (
-              <motion.button
+              <motion.div
                 key={symbol.symbol}
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
@@ -455,7 +455,7 @@ const ComparisonChart = forwardRef<HTMLDivElement, ComparisonChartProps>(({
                 onMouseEnter={() => handleLegendHover(symbol.symbol)}
                 onMouseLeave={handleLegendLeave}
                 className={cn(
-                  "flex items-center gap-2 px-3 py-1 rounded-full text-xs transition-all",
+                  "flex items-center gap-2 px-3 py-1 rounded-full text-xs transition-all cursor-pointer",
                   symbol.visible 
                     ? "bg-gray-100 dark:bg-gray-800 text-text-primary" 
                     : "bg-gray-50 dark:bg-gray-900 text-text-tertiary opacity-60",
@@ -484,7 +484,7 @@ const ComparisonChart = forwardRef<HTMLDivElement, ComparisonChartProps>(({
                     ×
                   </button>
                 )}
-              </motion.button>
+              </motion.div>
             ))}
           </AnimatePresence>
         </div>

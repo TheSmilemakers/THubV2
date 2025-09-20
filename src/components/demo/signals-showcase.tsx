@@ -13,6 +13,7 @@ import {
   SignalSparkline,
   SparklineDataPoint
 } from '@/components/signals';
+import { ChartsShowcase } from './charts-showcase';
 
 /**
  * SignalsShowcase Component - Demonstrates all signal components with sample data
@@ -104,7 +105,7 @@ const generateSparklineData = (trend: 'up' | 'down' | 'neutral' = 'neutral'): Sp
 
 export function SignalsShowcase() {
   const [selectedSignal, setSelectedSignal] = useState<Signal>(sampleSignals[0]);
-  const [activeTab, setActiveTab] = useState<'cards' | 'radar' | 'sparklines'>('cards');
+  const [activeTab, setActiveTab] = useState<'cards' | 'radar' | 'sparklines' | 'charts'>('cards');
 
   const handleSignalTap = (signal: Signal) => {
     console.log('Signal tapped:', signal.symbol);
@@ -141,7 +142,8 @@ export function SignalsShowcase() {
           {[
             { id: 'cards', label: 'Signal Cards' },
             { id: 'radar', label: 'Convergence Radar' },
-            { id: 'sparklines', label: 'Sparklines' }
+            { id: 'sparklines', label: 'Sparklines' },
+            { id: 'charts', label: 'Charts & Indicators' }
           ].map((tab) => (
             <button
               key={tab.id}
@@ -394,6 +396,11 @@ export function SignalsShowcase() {
               </div>
             </div>
           </section>
+        )}
+
+        {/* Charts Tab */}
+        {activeTab === 'charts' && (
+          <ChartsShowcase />
         )}
       </motion.div>
 

@@ -167,6 +167,7 @@ export function HeroContent({ onInitialize, isInitializing, isInitialized, hasEr
         </button>
 
         <button
+          onClick={() => router.push('/demo')}
           className={cn(
             "px-8 py-4 rounded-xl font-semibold text-lg transition-all duration-300",
             "touch-target min-w-[200px]",
