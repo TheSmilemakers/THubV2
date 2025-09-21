@@ -89,13 +89,13 @@
   
   .glass-hero {
     background: rgba(255, 255, 255, 0.01);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border: 1px solid rgba(255, 255, 255, 0.05);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: 1.5rem;
     box-shadow: 
-      0 8px 32px rgba(0, 0, 0, 0.12),
-      inset 0 1px 0 rgba(255, 255, 255, 0.02);
+      0 8px 32px rgba(0, 0, 0, 0.08),
+      inset 0 1px 0 rgba(255, 255, 255, 0.03);
     position: relative;
     overflow: hidden;
     transform: translateZ(0);
@@ -107,8 +107,8 @@
     border: 2px solid rgba(139, 92, 246, 0.6);
     animation: pulse-glow-twice 6s ease-in-out forwards;
     background: rgba(255, 255, 255, 0.02);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
   }
   
   @keyframes pulse-glow-twice {
