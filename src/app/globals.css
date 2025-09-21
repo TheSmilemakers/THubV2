@@ -150,8 +150,13 @@
   display: block;
 }
 
-/* Fix for professional theme glass transparency */
-[data-theme="professional"] .glass-hero,
+/* Professional theme glass transparency - fully translucent */
+[data-theme="professional"] .glass-hero {
+  background: transparent !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
 [data-theme="professional"] .glass-card,
 [data-theme="professional"] .glass-surface {
   background: rgba(255, 255, 255, 0.05) !important;
