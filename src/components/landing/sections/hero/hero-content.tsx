@@ -134,10 +134,10 @@ export function HeroContent({ onInitialize, isInitializing, isInitialized, hasEr
           disabled={isInitializing || isInitialized}
           aria-label={
             isInitializing 
-              ? "System is initializing, please wait"
+              ? "System is initialising, please wait"
               : isInitialized
-                ? "Re-initialize the trading system"
-                : "Initialize the trading system"
+                ? "Re-initialise the trading system"
+                : "Initialise the trading system"
           }
           aria-busy={isInitializing}
           aria-pressed={isInitialized}
@@ -159,10 +159,10 @@ export function HeroContent({ onInitialize, isInitializing, isInitialized, hasEr
           )}
         >
           {isInitializing 
-            ? (theme === 'synthwave' ? '[INITIALIZING...]' : 'Initializing...')
+            ? (theme === 'synthwave' ? '[INITIALISING...]' : 'Initialising...')
             : isInitialized
-              ? (theme === 'synthwave' ? '[RE-INITIALIZE]' : 'Restart System')
-              : (theme === 'synthwave' ? '[INITIALIZE]' : 'Start Free Trial')
+              ? (theme === 'synthwave' ? '[RE-INITIALISE]' : 'Restart System')
+              : (theme === 'synthwave' ? '[INITIALISE]' : 'Initialise')
           }
         </button>
 
@@ -190,7 +190,7 @@ export function HeroContent({ onInitialize, isInitializing, isInitialized, hasEr
           disabled={!isInitialized}
           aria-label={
             !isInitialized
-              ? "Login button - Initialize system first to enable"
+              ? "Login button - Initialise system first to enable"
               : "Login to your trading account"
           }
           aria-disabled={!isInitialized}
@@ -231,8 +231,8 @@ export function HeroContent({ onInitialize, isInitializing, isInitialized, hasEr
           )}
         >
           {theme === 'synthwave' 
-            ? '[ERROR] INITIALIZATION TIMEOUT - PLEASE RETRY'
-            : 'Initialization timed out. Please try again.'
+            ? '[ERROR] INITIALISATION TIMEOUT - PLEASE RETRY'
+            : 'Initialisation timed out. Please try again.'
           }
         </motion.div>
       )}

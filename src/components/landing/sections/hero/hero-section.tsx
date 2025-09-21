@@ -142,7 +142,7 @@ export function HeroSection() {
           {/* Binary characters - reduced from 15 to 6 for performance */}
           {isInitialized && (
             <div className="absolute inset-0">
-              {[...Array(6)].map((_, i) => (
+              {[...Array(12)].map((_, i) => (
                 <div
                   key={`binary-${i}`}
                   className="binary-char"
