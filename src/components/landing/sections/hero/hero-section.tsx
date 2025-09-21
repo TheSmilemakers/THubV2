@@ -247,7 +247,7 @@ export function HeroSection() {
         </div>
       )}
       
-      <div className="container mx-auto px-4 z-10">
+      <div className="container mx-auto px-4 py-8 md:py-0 z-10">
         {theme === 'synthwave' ? (
           <TerminalWindow 
             title="THUB://V2.0" 
@@ -264,7 +264,7 @@ export function HeroSection() {
             />
           </TerminalWindow>
         ) : (
-          <div className={cn("glass-hero max-w-5xl mx-auto p-12 rounded-3xl", {
+          <div className={cn("glass-hero max-w-5xl mx-auto p-6 md:p-12 rounded-3xl", {
             "initialized": isInitialized
           })}>
             {isInitializing && (
