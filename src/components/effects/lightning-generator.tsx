@@ -125,7 +125,7 @@ const LightningGenerator = forwardRef<HTMLDivElement, LightningGeneratorProps>((
     }
   }, [enabled, canvasDimensions, lightningConfig, maxConcurrentStrikes]);
 
-  // Draw a single segment with glow effect
+  // Draw a single segment with glow effect - optimized for performance
   const drawSegment = (
     ctx: CanvasRenderingContext2D,
     segment: LightningSegment,
@@ -140,12 +140,10 @@ const LightningGenerator = forwardRef<HTMLDivElement, LightningGeneratorProps>((
     ctx.globalCompositeOperation = 'screen';
     ctx.globalAlpha = opacity * intensity;
     
-    // Draw multiple passes for glow effect
+    // Reduced passes for better performance (from 5 to 3)
     const passes = [
-      { width: width * glowRadius, color: colorOuter, alpha: 0.1 },
-      { width: width * glowRadius * 0.6, color: colorGlow, alpha: 0.2 },
-      { width: width * glowRadius * 0.3, color: colorGlow, alpha: 0.3 },
-      { width: width * 2, color: colorCore, alpha: 0.8 },
+      { width: width * glowRadius * 0.5, color: colorGlow, alpha: 0.15 },
+      { width: width * 2, color: colorCore, alpha: 0.6 },
       { width: width, color: colorCore, alpha: 1 }
     ];
     
@@ -156,12 +154,8 @@ const LightningGenerator = forwardRef<HTMLDivElement, LightningGeneratorProps>((
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
       
-      // Apply slight blur for outer passes
-      if (pass.width > width * 3) {
-        ctx.filter = `blur(${pass.width / 10}px)`;
-      } else {
-        ctx.filter = 'none';
-      }
+      // Remove blur filters completely - they cause major performance issues
+      // The visual glow effect is achieved through layering and alpha blending instead
       
       ctx.beginPath();
       ctx.moveTo(start.x, start.y);
@@ -178,7 +172,8 @@ const LightningGenerator = forwardRef<HTMLDivElement, LightningGeneratorProps>((
     if (!canvasRef.current || canvasDimensions.width === 0 || canvasDimensions.height === 0) return;
     
     const canvas = canvasRef.current;
-    const ctx = canvas.getContext('2d');
+    // Disable transparency for better performance
+    const ctx = canvas.getContext('2d', { alpha: false });
     if (!ctx) return;
     
     // Handle high DPI displays
@@ -200,7 +195,8 @@ const LightningGenerator = forwardRef<HTMLDivElement, LightningGeneratorProps>((
   const render = useCallback((timestamp: number) => {
     if (!canvasRef.current || !enabled || canvasDimensions.width === 0) return;
     
-    const ctx = canvasRef.current.getContext('2d');
+    // Use cached context with alpha: false for better performance
+    const ctx = canvasRef.current.getContext('2d', { alpha: false });
     if (!ctx) return;
     
     // Clear canvas

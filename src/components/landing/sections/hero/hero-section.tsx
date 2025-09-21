@@ -124,33 +124,33 @@ export function HeroSection() {
           {/* Mesh gradient overlay */}
           <div className="mesh-gradient-professional" />
           
-          {/* Floating particles */}
+          {/* Floating particles - reduced from 20 to 8 for performance */}
           <div className="particles-professional">
-            {[...Array(20)].map((_, i) => (
+            {[...Array(8)].map((_, i) => (
               <div
                 key={`particle-${i}`}
                 className="particle-orb"
                 style={{
                   left: `${Math.random() * 100}%`,
-                  animationDelay: `${i * 0.5}s`,
-                  animationDuration: `${15 + Math.random() * 10}s`,
+                  animationDelay: `${i * 1.2}s`,
+                  animationDuration: `${20 + Math.random() * 10}s`,
                 }}
               />
             ))}
           </div>
           
-          {/* Binary characters - only show after initialization */}
+          {/* Binary characters - reduced from 15 to 6 for performance */}
           {isInitialized && (
             <div className="absolute inset-0">
-              {[...Array(15)].map((_, i) => (
+              {[...Array(6)].map((_, i) => (
                 <div
                   key={`binary-${i}`}
                   className="binary-char"
                   style={{
                     left: `${Math.random() * 100}%`,
-                    fontSize: `${12 + Math.random() * 8}px`,
-                    animationDelay: `${i * 0.8}s`,
-                    animationDuration: `${8 + Math.random() * 4}s`,
+                    fontSize: `${14 + Math.random() * 6}px`,
+                    animationDelay: `${i * 1.5}s`,
+                    animationDuration: `${10 + Math.random() * 5}s`,
                   }}
                 >
                   {Math.random() > 0.5 ? '1' : '0'}
@@ -184,9 +184,9 @@ export function HeroSection() {
                   widthDecay: 0.85,
                   glowIntensity: 1.5
                 }}
-                strikeInterval={4000} // Less frequent for professional look
-                strikeDuration={150} // Shorter duration
-                maxConcurrentStrikes={2}
+                strikeInterval={6000} // Even less frequent for better performance
+                strikeDuration={120} // Shorter duration for less GPU load
+                maxConcurrentStrikes={1} // Only one strike at a time
                 colorCore="#ffffff"
                 colorGlow="#e0e7ff"
                 colorOuter="#c7d2fe"

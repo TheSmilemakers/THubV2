@@ -237,8 +237,8 @@
       opacity: 0.3;
     }
     50% {
-      transform: scale(1.5);
-      opacity: 0.6;
+      transform: scale(1.2);
+      opacity: 0.5;
     }
   }
   
