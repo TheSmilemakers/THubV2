@@ -11,6 +11,7 @@ import { RotatingDisc } from './rotating-disc';
 import { RotatingDiscCss } from './rotating-disc-css';
 import { TerminalWindow } from '@/components/landing/shared/terminal-window';
 import { ThemeToggle } from '@/components/landing/shared/theme-toggle';
+import { LightningGenerator } from '@/components/effects/lightning-generator';
 
 export function HeroSection() {
   const { theme } = useTheme();
@@ -160,126 +161,39 @@ export function HeroSection() {
           
           {/* Lightning effects - only show after initialization */}
           {isInitialized && (
-            <div className="lightning-container">
-              {/* Lightning Strike 1 - Complex zigzag from top-left */}
-              <svg className="lightning-svg lightning-strike-1" viewBox="0 0 100 100" preserveAspectRatio="none">
-                <path 
-                  className="lightning-path"
-                  d="M 8 3 L 12 15 L 18 12 L 22 28 L 28 24 L 32 42 L 38 38 L 45 55 L 52 50 L 58 68 L 65 64 L 72 82 L 78 78 L 85 95"
-                />
-                <path 
-                  className="lightning-branch"
-                  d="M 22 28 L 30 32 L 35 38 L 42 44"
-                />
-                <path 
-                  className="lightning-branch"
-                  d="M 45 55 L 40 62 L 35 68"
-                />
-                <path 
-                  className="lightning-branch"
-                  d="M 65 64 L 72 70 L 75 78"
-                />
-              </svg>
-              
-              {/* Lightning Strike 2 - Intricate center strike */}
-              <svg className="lightning-svg lightning-strike-2" viewBox="0 0 100 100" preserveAspectRatio="none">
-                <path 
-                  className="lightning-path"
-                  d="M 45 1 L 48 12 L 52 8 L 55 22 L 60 18 L 62 35 L 58 32 L 65 48 L 70 44 L 75 62 L 80 58 L 85 76 L 90 72 L 95 88 L 92 95"
-                />
-                <path 
-                  className="lightning-branch"
-                  d="M 55 22 L 48 28 L 42 35 L 38 42"
-                />
-                <path 
-                  className="lightning-branch"
-                  d="M 62 35 L 55 42 L 50 48"
-                />
-                <path 
-                  className="lightning-branch"
-                  d="M 75 62 L 82 68 L 88 75"
-                />
-              </svg>
-              
-              {/* Lightning Strike 3 - Dense branching from top-right */}
-              <svg className="lightning-svg lightning-strike-3" viewBox="0 0 100 100" preserveAspectRatio="none">
-                <path 
-                  className="lightning-path"
-                  d="M 92 5 L 88 18 L 82 15 L 78 32 L 72 28 L 68 45 L 62 42 L 55 58 L 48 55 L 42 72 L 35 68 L 28 85 L 22 82 L 15 95"
-                />
-                <path 
-                  className="lightning-branch"
-                  d="M 78 32 L 85 38 L 90 45"
-                />
-                <path 
-                  className="lightning-branch"
-                  d="M 68 45 L 75 52 L 80 58"
-                />
-                <path 
-                  className="lightning-branch"
-                  d="M 55 58 L 62 65 L 68 72"
-                />
-                <path 
-                  className="lightning-branch"
-                  d="M 42 72 L 35 78 L 28 85"
-                />
-              </svg>
-              
-              {/* Lightning Strike 4 - Horizontal web pattern */}
-              <svg className="lightning-svg lightning-strike-4" viewBox="0 0 100 100" preserveAspectRatio="none">
-                <path 
-                  className="lightning-path"
-                  d="M 2 28 L 12 32 L 8 35 L 18 38 L 22 42 L 32 45 L 28 48 L 38 52 L 42 55 L 52 58 L 48 62 L 58 65 L 62 68 L 72 72 L 68 75 L 78 78 L 82 82 L 92 85 L 98 88"
-                />
-                <path 
-                  className="lightning-branch"
-                  d="M 18 38 L 22 48 L 28 55 L 32 62"
-                />
-                <path 
-                  className="lightning-branch"
-                  d="M 42 55 L 45 65 L 50 72"
-                />
-                <path 
-                  className="lightning-branch"
-                  d="M 62 68 L 68 78 L 72 85"
-                />
-              </svg>
-              
-              {/* Lightning Strike 5 - Complex vertical with multiple branches */}
-              <svg className="lightning-svg lightning-strike-5" viewBox="0 0 100 100" preserveAspectRatio="none">
-                <path 
-                  className="lightning-path"
-                  d="M 50 2 L 48 15 L 52 12 L 49 28 L 53 25 L 47 42 L 51 38 L 46 55 L 54 52 L 52 68 L 48 65 L 51 82 L 47 78 L 50 95"
-                />
-                <path 
-                  className="lightning-branch"
-                  d="M 49 28 L 38 35 L 32 42 L 25 48"
-                />
-                <path 
-                  className="lightning-branch"
-                  d="M 53 25 L 62 32 L 68 38 L 75 45"
-                />
-                <path 
-                  className="lightning-branch"
-                  d="M 47 42 L 35 48 L 28 55"
-                />
-                <path 
-                  className="lightning-branch"
-                  d="M 51 38 L 65 45 L 72 52"
-                />
-                <path 
-                  className="lightning-branch"
-                  d="M 46 55 L 32 62 L 25 68"
-                />
-                <path 
-                  className="lightning-branch"
-                  d="M 54 52 L 68 58 L 75 65"
-                />
-              </svg>
-              
-              {/* Screen flash effect */}
-              <div className="lightning-screen-flash"></div>
-            </div>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 1, delay: 0.5 }}
+              className="absolute inset-0 pointer-events-none"
+            >
+              <LightningGenerator
+                className="absolute inset-0"
+                config={{
+                  // Professional theme: subtle and elegant
+                  maxSegmentLength: 60,
+                  minSegmentLength: 15,
+                  chaosFactor: Math.PI / 8, // Less chaotic, more elegant
+                  displacementFactor: 0.2, // Less displacement for smoother bolts
+                  branchProbability: 0.25, // Fewer branches
+                  maxBranchDepth: 3,
+                  branchAngleVariation: Math.PI / 10, // Smaller angle variation
+                  branchLengthDecay: 0.6,
+                  branchIntensityDecay: 0.5,
+                  baseWidth: 2,
+                  widthDecay: 0.85,
+                  glowIntensity: 1.5
+                }}
+                strikeInterval={4000} // Less frequent for professional look
+                strikeDuration={150} // Shorter duration
+                maxConcurrentStrikes={2}
+                colorCore="#ffffff"
+                colorGlow="#e0e7ff"
+                colorOuter="#c7d2fe"
+                glowRadius={15}
+                enabled={theme === 'professional'}
+              />
+            </motion.div>
           )}
         </div>
       )}

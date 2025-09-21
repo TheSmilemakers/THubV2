@@ -1,0 +1,480 @@
+{
+  "name": "Crypto Bot - Updated",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 4
+            }
+          ]
+        }
+      },
+      "id": "eeb9c53e-db6e-4d96-a3ed-595f2ebc5d56",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        250,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://api.coingecko.com/api/v3/coins/markets",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "vs_currency",
+              "value": "usd"
+            },
+            {
+              "name": "order",
+              "value": "volume_desc"
+            },
+            {
+              "name": "per_page",
+              "value": "150"
+            },
+            {
+              "name": "page",
+              "value": "1"
+            },
+            {
+              "name": "sparkline",
+              "value": "true"
+            },
+            {
+              "name": "price_change_percentage",
+              "value": "1h,24h,7d,30d"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a490b86f-f365-4960-87fc-85b1dbe4aace",
+      "name": "Get Market Data",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        450,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://api.alternative.me/fng/",
+        "options": {}
+      },
+      "id": "584d6f1a-34bf-482b-bc92-9269ccbcfc7e",
+      "name": "Get Fear & Greed Index",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        450,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Filter out stablecoins, wrapped tokens, and bridged tokens\nconst items = $input.all();\nconst filteredCoins = [];\n\n// Stablecoin patterns\nconst stableSymbols = /^(USDT|USDC|USDD|USDE|DAI|BUSD|TUSD|USDP|FRAX|GUSD|HUSD|UST|PAXG|XAUT)$/i;\nconst stablePatterns = /USD|USDT|USDC|DAI|BUSD|TUSD|GUSD|HUSD|USDP|FRAX/i;\n\n// Wrapped token patterns\nconst wrappedSymbols = /^W[A-Z]+|^(HBTC|renBTC|RBTC|sBTC|pBTC|imBTC|acBTC|mBTC|stETH|cbETH|rETH|frxETH)$/i;\nconst wrappedName = /(wrapped|bridged|pegged|stablecoin)/i;\n\nfor (const item of items) {\n  const coin = item.json;\n  const symbol = (coin.symbol || '').toUpperCase();\n  const name = (coin.name || '');\n  \n  // Skip if it's a stablecoin\n  if (stableSymbols.test(symbol) || stablePatterns.test(symbol)) {\n    continue;\n  }\n  \n  // Skip if it's a wrapped token\n  if (wrappedSymbols.test(symbol)) {\n    continue;\n  }\n  \n  // Skip if name contains wrapped/bridged/pegged\n  if (wrappedName.test(name)) {\n    continue;\n  }\n  \n  // Skip if symbol contains dots (often derivatives)\n  if (symbol.includes('.')) {\n    continue;\n  }\n  \n  // Add to filtered list\n  filteredCoins.push(item);\n}\n\nreturn filteredCoins;"
+      },
+      "id": "filter-exclusions-node",
+      "name": "Filter Exclusions",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        650,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "maxItems": 50
+      },
+      "id": "limit-50-node",
+      "name": "Limit to 50",
+      "type": "n8n-nodes-base.limit",
+      "typeVersion": 1,
+      "position": [
+        850,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Merge Fear & Greed sentiment with all coins\nconst coins = $input.all('0');\nconst fearGreedResponse = $input.all('1');\n\n// Extract Fear & Greed data\nconst fearGreedData = fearGreedResponse[0]?.json?.data?.[0] || {\n  value: \"50\",\n  value_classification: \"Neutral\"\n};\n\n// Add sentiment to each coin\nconst mergedCoins = coins.map(item => {\n  return {\n    json: {\n      ...item.json,\n      fear_greed_value: parseInt(fearGreedData.value),\n      fear_greed_classification: fearGreedData.value_classification,\n      fear_greed_timestamp: fearGreedData.timestamp || new Date().toISOString()\n    }\n  };\n});\n\nreturn mergedCoins;"
+      },
+      "id": "merge-sentiment-node",
+      "name": "Merge Sentiment",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1050,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Technical Analysis with Sentiment Integration\nconst items = $input.all();\nconst analyzedCoins = [];\n\nfor (const item of items) {\n  const coin = item.json;\n  const fearGreedValue = coin.fear_greed_value || 50;\n  const fearGreedClass = coin.fear_greed_classification || 'Neutral';\n  \n  // Calculate technical indicators\n  const analysis = {\n    symbol: coin.symbol.toUpperCase(),\n    name: coin.name,\n    current_price: coin.current_price,\n    market_cap: coin.market_cap,\n    volume_24h: coin.total_volume,\n    \n    // Price changes\n    price_change_1h: coin.price_change_percentage_1h_in_currency || 0,\n    price_change_24h: coin.price_change_percentage_24h || 0,\n    price_change_7d: coin.price_change_percentage_7d_in_currency || 0,\n    price_change_30d: coin.price_change_percentage_30d_in_currency || 0,\n    \n    // Technical indicators\n    volume_to_market_cap_ratio: (coin.total_volume / coin.market_cap) * 100,\n    volatility_score: Math.abs(coin.price_change_percentage_24h || 0),\n    \n    // Support/Resistance levels\n    support_level: coin.low_24h,\n    resistance_level: coin.high_24h,\n    current_position: ((coin.current_price - coin.low_24h) / (coin.high_24h - coin.low_24h)) * 100,\n    \n    // Market indicators\n    ath_change_percentage: coin.ath_change_percentage,\n    atl_change_percentage: coin.atl_change_percentage,\n    \n    // Sentiment data\n    market_sentiment: fearGreedClass,\n    sentiment_score: fearGreedValue,\n    \n    // Scoring system (0-100)\n    technical_score: 0,\n    momentum_score: 0,\n    volume_score: 0,\n    sentiment_alignment_score: 0,\n    overall_score: 0,\n    \n    // Signals\n    signals: [],\n    recommendation: \"\"\n  };\n  \n  // Calculate technical score\n  if (analysis.current_position < 30) analysis.technical_score += 25; // Near support\n  if (analysis.price_change_24h > 0 && analysis.price_change_7d > 0) analysis.technical_score += 25; // Uptrend\n  if (analysis.ath_change_percentage > -50) analysis.technical_score += 25; // Not too far from ATH\n  if (analysis.volatility_score < 10) analysis.technical_score += 25; // Low volatility\n  \n  // Calculate momentum score\n  if (analysis.price_change_1h > 0) analysis.momentum_score += 20;\n  if (analysis.price_change_24h > 0) analysis.momentum_score += 20;\n  if (analysis.price_change_7d > 0) analysis.momentum_score += 30;\n  if (analysis.price_change_30d > 0) analysis.momentum_score += 30;\n  \n  // Calculate volume score\n  if (analysis.volume_to_market_cap_ratio > 5) analysis.volume_score += 50; // High volume\n  if (coin.total_volume > 100000000) analysis.volume_score += 50; // Minimum liquidity\n  \n  // Calculate sentiment alignment score\n  // Buy when others are fearful\n  if (fearGreedValue < 30 && analysis.price_change_24h < -5) {\n    analysis.sentiment_alignment_score = 90; // Extreme fear + oversold = opportunity\n  } else if (fearGreedValue < 50 && analysis.price_change_24h < 0) {\n    analysis.sentiment_alignment_score = 70; // Fear + red = good entry\n  } else if (fearGreedValue > 70 && analysis.price_change_24h > 5) {\n    analysis.sentiment_alignment_score = 20; // Greed + pumping = risky\n  } else {\n    analysis.sentiment_alignment_score = 50; // Neutral\n  }\n  \n  // Overall score with sentiment integration\n  analysis.overall_score = (\n    analysis.technical_score * 0.3 + \n    analysis.momentum_score * 0.2 + \n    analysis.volume_score * 0.2 +\n    analysis.sentiment_alignment_score * 0.3\n  );\n  \n  // Generate signals\n  if (analysis.current_position < 30) analysis.signals.push(\"Near 24h support level\");\n  if (analysis.volume_to_market_cap_ratio > 10) analysis.signals.push(\"High volume activity\");\n  if (analysis.price_change_7d > 10) analysis.signals.push(\"Strong weekly momentum\");\n  if (analysis.price_change_24h > 5 && analysis.price_change_1h > 1) analysis.signals.push(\"Short-term breakout\");\n  if (fearGreedValue < 30) analysis.signals.push(\"Market in extreme fear\");\n  if (analysis.sentiment_alignment_score >= 70) analysis.signals.push(\"Favorable sentiment alignment\");\n  \n  // Generate recommendation\n  if (analysis.overall_score >= 70) {\n    analysis.recommendation = \"STRONG BUY\";\n  } else if (analysis.overall_score >= 50) {\n    analysis.recommendation = \"BUY\";\n  } else if (analysis.overall_score >= 30) {\n    analysis.recommendation = \"HOLD\";\n  } else {\n    analysis.recommendation = \"WAIT\";\n  }\n  \n  analyzedCoins.push({ json: analysis });\n}\n\nreturn analyzedCoins;"
+      },
+      "id": "cc1c0c79-95ed-4f70-9008-1c7da0764a2f",
+      "name": "Technical Analysis",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1250,
+        300
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "buy-filter",
+              "leftValue": "={{ $json.recommendation }}",
+              "rightValue": "BUY",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "id": "db5f9d97-016a-4ed4-ae6a-f00f44f14a53",
+      "name": "Filter Buy Signals",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2,
+      "position": [
+        1450,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Enhanced Analysis with RSI & Whale Detection\n// Now receives coins that already have sentiment data\n\nconst items = $input.all();\nconst enhancedCoins = [];\n\nfor (const item of items) {\n  const coin = item.json;\n  \n  // Simple RSI calculation based on price momentum\n  const priceChange24h = coin.price_change_24h || 0;\n  const priceChange7d = coin.price_change_7d || 0;\n  \n  // Simplified RSI proxy (0-100)\n  let rsi = 50; // neutral\n  if (priceChange24h < -5) rsi = 30 - Math.min(20, Math.abs(priceChange24h));\n  else if (priceChange24h > 5) rsi = 70 + Math.min(20, priceChange24h);\n  else rsi = 50 + (priceChange24h * 4);\n  \n  rsi = Math.max(0, Math.min(100, rsi));\n  \n  // Whale activity based on volume\n  const volumeRatio = coin.volume_to_market_cap_ratio || 0;\n  let whaleScore = Math.min(100, volumeRatio * 10);\n  let whaleLevel = 'LOW';\n  if (whaleScore > 70) whaleLevel = 'HIGH';\n  else if (whaleScore > 40) whaleLevel = 'MEDIUM';\n  \n  // Risk assessment\n  let riskScore = 0;\n  if (coin.volatility_score > 20) riskScore += 30;\n  if (rsi > 80 || rsi < 20) riskScore += 30;\n  if (whaleLevel === 'HIGH') riskScore += 20;\n  if (coin.ath_change_percentage < -80) riskScore += 20;\n  \n  let riskLevel = 'LOW';\n  if (riskScore > 70) riskLevel = 'HIGH';\n  else if (riskScore > 40) riskLevel = 'MEDIUM';\n  \n  // Calculate final score incorporating all factors\n  const technicalWeight = 0.4;\n  const sentimentWeight = 0.3;\n  const whaleWeight = 0.15;\n  const rsiWeight = 0.15;\n  \n  const rsiScore = rsi < 30 ? 80 : (rsi > 70 ? 20 : 50);\n  \n  const finalScore = (\n    coin.overall_score * technicalWeight +\n    coin.sentiment_alignment_score * sentimentWeight +\n    whaleScore * whaleWeight +\n    rsiScore * rsiWeight\n  );\n  \n  // Suggested entry/exit levels\n  const suggestedEntryPrice = coin.current_price * 0.99;\n  const suggestedStopLoss = coin.support_level * 0.97;\n  const suggestedTakeProfit = coin.resistance_level * 1.02;\n  \n  // Add enhanced data to coin\n  const enhancedCoin = {\n    ...coin,\n    rsi: Math.round(rsi),\n    rsi_signal: rsi < 30 ? 'OVERSOLD' : (rsi > 70 ? 'OVERBOUGHT' : 'NEUTRAL'),\n    whale_activity: {\n      score: Math.round(whaleScore),\n      level: whaleLevel\n    },\n    risk_level: riskLevel,\n    suggested_entry_price: suggestedEntryPrice,\n    suggested_stop_loss: suggestedStopLoss,\n    suggested_take_profit: suggestedTakeProfit,\n    final_score: Math.round(finalScore)\n  };\n  \n  enhancedCoins.push({ json: enhancedCoin });\n}\n\nreturn enhancedCoins;"
+      },
+      "id": "39485a40-36eb-4409-992c-21142f405fea",
+      "name": "Enhanced Analysis with RSI & Whale Detection",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1650,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "sortFieldsUi": {
+          "sortField": [
+            {
+              "fieldName": "final_score",
+              "order": "descending"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "42a8d6d8-d7e0-489c-ad42-e9a2c203c7a3",
+      "name": "Sort by Final Score",
+      "type": "n8n-nodes-base.sort",
+      "typeVersion": 1,
+      "position": [
+        1850,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "maxItems": 10
+      },
+      "id": "c4d0f2d0-03a7-48f0-8f1c-7e51ad612342",
+      "name": "Top 10 Opportunities",
+      "type": "n8n-nodes-base.limit",
+      "typeVersion": 1,
+      "position": [
+        2050,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Format recommendations for output\nconst items = $input.all();\nconst formattedItems = [];\n\nfor (const item of items) {\n  const coin = item.json;\n  \n  // Format the output with all required fields\n  const formatted = {\n    // Basic info\n    symbol: coin.symbol,\n    name: coin.name,\n    current_price: coin.current_price,\n    market_cap: coin.market_cap,\n    volume_24h: coin.volume_24h,\n    \n    // Price changes\n    price_change_1h: coin.price_change_1h,\n    price_change_24h: coin.price_change_24h,\n    price_change_7d: coin.price_change_7d,\n    price_change_30d: coin.price_change_30d,\n    \n    // Technical metrics\n    volume_to_market_cap_ratio: coin.volume_to_market_cap_ratio,\n    volatility_score: coin.volatility_score,\n    support_level: coin.support_level,\n    resistance_level: coin.resistance_level,\n    current_position: coin.current_position,\n    ath_change_percentage: coin.ath_change_percentage,\n    atl_change_percentage: coin.atl_change_percentage,\n    \n    // Scores\n    technical_score: coin.technical_score,\n    momentum_score: coin.momentum_score,\n    volume_score: coin.volume_score,\n    overall_score: coin.overall_score,\n    final_score: coin.final_score,\n    \n    // Analysis results\n    signals: coin.signals,\n    recommendation: coin.recommendation,\n    rsi: coin.rsi,\n    rsi_signal: coin.rsi_signal,\n    whale_activity: JSON.stringify(coin.whale_activity),\n    market_sentiment: coin.market_sentiment,\n    sentiment_score: coin.sentiment_score,\n    risk_level: coin.risk_level,\n    \n    // Trading suggestions\n    suggested_entry_price: coin.suggested_entry_price,\n    suggested_stop_loss: coin.suggested_stop_loss,\n    suggested_take_profit: coin.suggested_take_profit,\n    \n    // Metadata\n    timestamp: new Date().toISOString()\n  };\n  \n  formattedItems.push({ json: formatted });\n}\n\nreturn formattedItems;"
+      },
+      "id": "851c0a93-d800-4b87-a261-6004554d4c60",
+      "name": "Format Recommendations",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2250,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.THUB_WEBHOOK_URL || 'http://localhost:3000' }}/api/webhooks/crypto",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-webhook-secret",
+              "value": "={{ $env.CRYPTO_WEBHOOK_SECRET || 'test-secret' }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ signals: $items().map(item => item.json), metadata: { source: 'n8n-crypto-bot', version: '2.0', timestamp: new Date().toISOString() } }) }}",
+        "options": {}
+      },
+      "id": "webhook-to-supabase",
+      "name": "Send to THub Webhook",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        2450,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1MuC3TqLotYwM2Uk1M0eWgb-mfHBmP0mjEFA3YzaB_r4",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "symbol": "={{ $json.symbol }}",
+            "name": "={{ $json.name }}",
+            "current_price": "={{ $json.current_price }}",
+            "market_cap": "={{ $json.market_cap }}",
+            "volume_24h": "={{ $json.volume_24h }}",
+            "price_change_1h": "={{ $json.price_change_1h }}",
+            "price_change_24h": "={{ $json.price_change_24h }}",
+            "price_change_7d": "={{ $json.price_change_7d }}",
+            "price_change_30d": "={{ $json.price_change_30d }}",
+            "volume_to_market_cap_ratio": "={{ $json.volume_to_market_cap_ratio }}",
+            "volatility_score": "={{ $json.volatility_score }}",
+            "support_level": "={{ $json.support_level }}",
+            "resistance_level": "={{ $json.resistance_level }}",
+            "current_position": "={{ $json.current_position }}",
+            "ath_change_percentage": "={{ $json.ath_change_percentage }}",
+            "atl_change_percentage": "={{ $json.atl_change_percentage }}",
+            "technical_score": "={{ $json.technical_score }}",
+            "momentum_score": "={{ $json.momentum_score }}",
+            "volume_score": "={{ $json.volume_score }}",
+            "overall_score": "={{ $json.overall_score }}",
+            "signals": "={{ $json.signals }}",
+            "recommendation": "={{ $json.recommendation }}",
+            "rsi": "={{ $json.rsi }}",
+            "rsi_signal": "={{ $json.rsi_signal }}",
+            "whale_activity": "={{ $json.whale_activity }}",
+            "market_sentiment": "={{ $json.market_sentiment }}",
+            "sentiment_score": "={{ $json.sentiment_score }}",
+            "risk_level": "={{ $json.risk_level }}",
+            "suggested_entry_price": "={{ $json.suggested_entry_price }}",
+            "suggested_stop_loss": "={{ $json.suggested_stop_loss }}",
+            "suggested_take_profit": "={{ $json.suggested_take_profit }}",
+            "final_score": "={{ $json.final_score }}",
+            "timestamp": "={{ $json.timestamp }}"
+          }
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        2450,
+        400
+      ],
+      "id": "dd84a8ef-5727-4b5d-bfcc-08941cf71d25",
+      "name": "Google Sheets",
+      "credentials": {
+        "googleApi": {
+          "id": "FETa49i1LdL73ifQ",
+          "name": "Google Sheets account 2"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get Market Data",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get Fear & Greed Index",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Market Data": {
+      "main": [
+        [
+          {
+            "node": "Filter Exclusions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Exclusions": {
+      "main": [
+        [
+          {
+            "node": "Limit to 50",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Limit to 50": {
+      "main": [
+        [
+          {
+            "node": "Merge Sentiment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Fear & Greed Index": {
+      "main": [
+        [
+          {
+            "node": "Merge Sentiment",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge Sentiment": {
+      "main": [
+        [
+          {
+            "node": "Technical Analysis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Technical Analysis": {
+      "main": [
+        [
+          {
+            "node": "Filter Buy Signals",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Buy Signals": {
+      "main": [
+        [
+          {
+            "node": "Enhanced Analysis with RSI & Whale Detection",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enhanced Analysis with RSI & Whale Detection": {
+      "main": [
+        [
+          {
+            "node": "Sort by Final Score",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sort by Final Score": {
+      "main": [
+        [
+          {
+            "node": "Top 10 Opportunities",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Top 10 Opportunities": {
+      "main": [
+        [
+          {
+            "node": "Format Recommendations",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Recommendations": {
+      "main": [
+        [
+          {
+            "node": "Send to THub Webhook",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Google Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "2.0.0",
+  "id": "cGomRniO6uV6JREq",
+  "meta": {
+    "instanceId": "n8n-crypto-bot-updated"
+  },
+  "tags": []
+}

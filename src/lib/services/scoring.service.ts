@@ -165,6 +165,7 @@ export class ScoringService {
       case 'STRONG': return 70;
       case 'MODERATE': return 60;
       case 'WEAK': return 0;
+      default: return 0;
     }
   }
 }

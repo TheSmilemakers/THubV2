@@ -8,10 +8,9 @@ export type SignalStrength = Database['public']['Enums']['signal_strength'];
 export type SignalRow = Database['public']['Tables']['signals']['Row'];
 export type IndicatorCacheRow = Database['public']['Tables']['indicator_cache']['Row'];
 export type TestUserRow = Database['public']['Tables']['test_users']['Row'];
-// Note: These tables don't exist in the current schema but are referenced in code
-// TODO: Add these tables to the database schema
-export type MarketScanQueueRow = any;
-export type MarketScanHistoryRow = any;
+export type CryptoSignalRow = Database['public']['Tables']['crypto_signals']['Row'];
+export type MarketScanQueueRow = Database['public']['Tables']['market_scan_queue']['Row'];
+export type MarketScanHistoryRow = Database['public']['Tables']['market_scan_history']['Row'];
 
 // Application-level interfaces with proper numeric types
 export interface Signal {

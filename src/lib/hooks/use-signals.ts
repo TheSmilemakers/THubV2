@@ -165,7 +165,7 @@ export function useSaveSignal() {
                 ? {
                     ...signal,
                     saved_by: signal.saved_by?.includes(user.id)
-                      ? signal.saved_by.filter(id => id !== user.id)
+                      ? signal.saved_by.filter((id: string) => id !== user.id)
                       : [...(signal.saved_by || []), user.id]
                   }
                 : signal
@@ -183,7 +183,7 @@ export function useSaveSignal() {
           return {
             ...old,
             saved_by: old.saved_by?.includes(user.id)
-              ? old.saved_by.filter(id => id !== user.id)
+              ? old.saved_by.filter((id: string) => id !== user.id)
               : [...(old.saved_by || []), user.id]
           }
         }
